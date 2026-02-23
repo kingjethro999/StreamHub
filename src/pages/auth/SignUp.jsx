@@ -38,7 +38,8 @@ export default function SignUp() {
       setError(error.message)
       setLoading(false)
     } else {
-      navigate("/auth/sign-up-success")
+      // Direct redirect since we don't support email confirmation yet
+      navigate("/")
     }
   }
 

@@ -8,7 +8,6 @@ import Settings from "./pages/Settings"
 import Upload from "./pages/Upload"
 import Login from "./pages/auth/Login"
 import SignUp from "./pages/auth/SignUp"
-import SignUpSuccess from "./pages/auth/SignUpSuccess"
 import StreamDetails from "./pages/StreamDetails"
 import ChannelDetails from "./pages/ChannelDetails"
 import { Layout } from "./components/layout"
@@ -30,7 +29,6 @@ function App() {
 
       <Route path="/auth/login" element={<Login />} />
       <Route path="/auth/sign-up" element={<SignUp />} />
-      <Route path="/auth/sign-up-success" element={<SignUpSuccess />} />
     </Routes>
   )
 }

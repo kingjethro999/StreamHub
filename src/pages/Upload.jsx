@@ -191,9 +191,11 @@ export default function Upload() {
                         </form>
                     ) : (
                         <div className="py-12 flex flex-col items-center justify-center text-center">
-                            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                                <span className="text-2xl">📡</span>
-                            </div>
+                            <img
+                                src="/workspace-desk-setup-streaming.jpg"
+                                alt="Live streaming coming soon"
+                                className="w-64 max-w-full mb-8 rounded-lg opacity-80 mix-blend-luminosity"
+                            />
                             <h3 className="text-xl font-bold text-foreground mb-2">Live Streaming</h3>
                             <p className="text-muted-foreground max-w-sm">
                                 Broadcast yourself to the world in real-time. This feature is coming soon in a future update!

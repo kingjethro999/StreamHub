@@ -58,7 +58,12 @@ export function StreamCatalog() {
           <p className="text-muted-foreground">Loading streams...</p>
         </div>
       ) : streams.length === 0 ? (
-        <div className="text-center py-12">
+        <div className="py-24 flex flex-col items-center justify-center text-center">
+          <img
+            src="/workspace-desk-setup-streaming.jpg"
+            alt="No live streams illustration"
+            className="w-64 max-w-full mb-8 rounded-lg opacity-80 mix-blend-luminosity"
+          />
           <p className="text-muted-foreground">No live streams at the moment. Check back soon!</p>
         </div>
       ) : (

@@ -59,7 +59,10 @@ export default function Upload() {
             })
 
             if (!uploadRes.ok) {
-                throw new Error("Failed to upload video to Cloudinary")
+                const errorData = await uploadRes.json().catch(() => null)
+                const errorMessage = errorData?.error?.message || "Failed to upload video to Cloudinary"
+                console.error("Cloudinary error details:", errorData || "No JSON response")
+                throw new Error(`Cloudinary Error: ${errorMessage}`)
             }
 
             const cloudinaryData = await uploadRes.json()

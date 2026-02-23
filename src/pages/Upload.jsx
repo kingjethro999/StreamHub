@@ -88,7 +88,7 @@ export default function Upload() {
     }
 
     const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "streamhub_uploads"
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "images"
 
     const uwConfig = {
         cloudName,

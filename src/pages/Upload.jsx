@@ -148,12 +148,23 @@ export default function Upload() {
                                         setThumbnailUrl={setThumbnailUrl}
                                     />
                                 ) : (
-                                    <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg flex items-center justify-between">
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-semibold text-foreground">Video Uploaded Successfully!</span>
-                                            <span className="text-xs text-muted-foreground max-w-[250px] truncate">{videoUrl}</span>
+                                    <div className="flex flex-col gap-3">
+                                        <div className="relative rounded-lg overflow-hidden border border-border bg-black aspect-video flex items-center justify-center">
+                                            <video
+                                                src={videoUrl}
+                                                poster={thumbnailUrl}
+                                                controls
+                                                className="w-full h-full object-contain"
+                                            />
                                         </div>
-                                        <Button type="button" variant="outline" size="sm" onClick={() => { setVideoUrl(""); setThumbnailUrl(""); setPublicId(""); }}>Change</Button>
+                                        <div className="flex items-center justify-between px-1">
+                                            <span className="text-sm font-medium text-muted-foreground truncate mr-4">
+                                                {videoUrl.split('/').pop()}
+                                            </span>
+                                            <Button type="button" variant="outline" size="sm" onClick={() => { setVideoUrl(""); setThumbnailUrl(""); setPublicId(""); }}>
+                                                Change Video
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
                             </div>

@@ -2,19 +2,24 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "../lib/supabase/client"
-import { UploadCloud, X, Loader2 } from "lucide-react"
+import { X, Loader2 } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card } from "../components/ui/card"
 import { useNavigate } from "react-router-dom"
+import CloudinaryUploadWidget from "../components/CloudinaryUploadWidget"
 
 export default function Upload() {
     const navigate = useNavigate()
     const [activeTab, setActiveTab] = useState("upload") // "upload" | "live"
-    const [file, setFile] = useState(null)
     const [title, setTitle] = useState("")
     const [description, setDescription] = useState("")
     const [uploading, setUploading] = useState(false)
     const [error, setError] = useState(null)
+
+    // Cloudinary Widget state
+    const [publicId, setPublicId] = useState("")
+    const [videoUrl, setVideoUrl] = useState("")
+    const [thumbnailUrl, setThumbnailUrl] = useState("")
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -27,16 +32,10 @@ export default function Upload() {
         checkAuth()
     }, [navigate])
 
-    const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            setFile(e.target.files[0])
-        }
-    }
-
     const handleUpload = async (e) => {
         e.preventDefault()
-        if (!file || !title) {
-            setError("Please provide a video and a title.")
+        if (!videoUrl || !title) {
+            setError("Please upload a video and provide a title.")
             return
         }
 
@@ -44,33 +43,7 @@ export default function Upload() {
             setUploading(true)
             setError(null)
 
-            // 1. Upload to Cloudinary
-            const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
-            const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "streamhub_uploads"
-
-            const formData = new FormData()
-            formData.append("file", file)
-            formData.append("upload_preset", uploadPreset)
-            formData.append("resource_type", "video")
-
-            const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/video/upload`, {
-                method: "POST",
-                body: formData,
-            })
-
-            if (!uploadRes.ok) {
-                const errorData = await uploadRes.json().catch(() => null)
-                const errorMessage = errorData?.error?.message || "Failed to upload video to Cloudinary"
-                console.error("Cloudinary error details:", errorData || "No JSON response")
-                throw new Error(`Cloudinary Error: ${errorMessage}`)
-            }
-
-            const cloudinaryData = await uploadRes.json()
-            const videoUrl = cloudinaryData.secure_url
-            // Create a thumbnail by replacing the video extension with jpg (Cloudinary's dynamic generation)
-            const thumbnailUrl = videoUrl.replace(/\.[^/.]+$/, ".jpg")
-
-            // 2. Save to Supabase
+            // Save to Supabase
             const supabase = createClient()
             const { data: { user } } = await supabase.auth.getUser()
 
@@ -108,10 +81,22 @@ export default function Upload() {
             navigate("/") // go back to feed on success
         } catch (err) {
             console.error(err)
-            setError(err.message || "An unexpected error occurred during upload")
+            setError(err.message || "An unexpected error occurred during saving")
         } finally {
             setUploading(false)
         }
+    }
+
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "streamhub_uploads"
+
+    const uwConfig = {
+        cloudName,
+        uploadPreset,
+        multiple: false,
+        resourceType: "video",
+        clientAllowedFormats: ["mp4", "webm", "mkv", "mov"],
+        maxFileSize: 104857600, // 100MB
     }
 
     return (
@@ -155,19 +140,22 @@ export default function Upload() {
 
                             <div>
                                 <label className="block text-sm font-medium mb-2 text-foreground">Video File</label>
-                                <div className="border-2 border-dashed border-primary/50 bg-primary/5 rounded-lg p-8 text-center hover:bg-primary/10 transition-colors cursor-pointer relative group">
-                                    <input
-                                        type="file"
-                                        accept="video/*"
-                                        onChange={handleFileChange}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                {!videoUrl ? (
+                                    <CloudinaryUploadWidget
+                                        uwConfig={uwConfig}
+                                        setPublicId={setPublicId}
+                                        setVideoUrl={setVideoUrl}
+                                        setThumbnailUrl={setThumbnailUrl}
                                     />
-                                    <UploadCloud className="mx-auto mb-2 text-primary group-hover:scale-110 transition-transform" size={48} />
-                                    <p className="text-sm font-medium text-foreground">
-                                        {file ? file.name : "Drag and drop or click to upload"}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-2">MP4, WebM, or OGG</p>
-                                </div>
+                                ) : (
+                                    <div className="bg-primary/10 border border-primary/20 p-4 rounded-lg flex items-center justify-between">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-semibold text-foreground">Video Uploaded Successfully!</span>
+                                            <span className="text-xs text-muted-foreground max-w-[250px] truncate">{videoUrl}</span>
+                                        </div>
+                                        <Button type="button" variant="outline" size="sm" onClick={() => { setVideoUrl(""); setThumbnailUrl(""); setPublicId(""); }}>Change</Button>
+                                    </div>
+                                )}
                             </div>
 
                             <div>

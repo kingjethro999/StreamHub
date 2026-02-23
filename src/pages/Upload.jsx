@@ -191,7 +191,7 @@ export default function Upload() {
                                 />
                             </div>
 
-                            <Button type="submit" className="w-full h-12 text-lg font-semibold" disabled={uploading || !file || !title}>
+                            <Button type="submit" className="w-full h-12 text-lg font-semibold" disabled={uploading || !videoUrl || !title}>
                                 {uploading ? (
                                     <>
                                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />

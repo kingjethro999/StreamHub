@@ -64,7 +64,7 @@ export default function Upload() {
                 throw new Error("You must create a channel before uploading. Go to Settings to set up your profile.")
             }
 
-            const { error: dbError } = await supabase
+            const { data: streamData, error: dbError } = await supabase
                 .from("streams")
                 .insert({
                     title,
@@ -75,8 +75,21 @@ export default function Upload() {
                     video_url: videoUrl,
                     channel_id: channelId,
                 })
+                .select()
+                .single()
 
             if (dbError) throw dbError
+
+            // Trigger notification edge function (fire-and-forget so UI doesn't block)
+            fetch('/api/notify-followers', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    channelId: channelId,
+                    streamTitle: title,
+                    streamUrl: `${window.location.origin}/stream/${streamData.id}`
+                })
+            }).catch(e => console.error("Failed to trigger notifications", e))
 
             navigate("/") // go back to feed on success
         } catch (err) {

@@ -49,7 +49,7 @@ export function SwipeFeed() {
 
     if (streams.length === 0) {
         return (
-            <div className="h-full flex flex-col items-center justify-center bg-background px-4 text-center">
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background px-4 text-center">
                 <img
                     src="/workspace-desk-setup-streaming.jpg"
                     alt="No streams available"

@@ -9,7 +9,6 @@ export function Navigation() {
     { href: "/", icon: Home, label: "Home" },
     { href: "/search", icon: Search, label: "Search" },
     { href: "/upload", icon: PlusSquare, label: "Upload" },
-    { href: "/activity", icon: Video, label: "Activity" },
     { href: "/alerts", icon: Bell, label: "Alerts" },
     { href: "/profile", icon: User, label: "Profile" },
   ]

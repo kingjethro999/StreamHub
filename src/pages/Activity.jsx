@@ -22,6 +22,8 @@ export default function Activity() {
         const { data } = await supabase.from("follows").select("*, channel:channels(*)").eq("user_id", user.id)
 
         setActivities(data || [])
+      } else {
+        navigate("/auth/login")
       }
     }
 

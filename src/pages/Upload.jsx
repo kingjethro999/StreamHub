@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "../lib/supabase/client"
 import { UploadCloud, X, Loader2 } from "lucide-react"
 import { Button } from "../components/ui/button"
@@ -15,6 +15,17 @@ export default function Upload() {
     const [description, setDescription] = useState("")
     const [uploading, setUploading] = useState(false)
     const [error, setError] = useState(null)
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) {
+                navigate("/auth/login")
+            }
+        }
+        checkAuth()
+    }, [navigate])
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {

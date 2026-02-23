@@ -1,11 +1,24 @@
 "use client"
 
+import { useEffect } from "react"
+import { createClient } from "../lib/supabase/client"
 import { Bell, X } from "lucide-react"
 import { Card } from "../components/ui/card"
 import { useNavigate } from "react-router-dom"
 
 export default function Alerts() {
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        navigate("/auth/login")
+      }
+    }
+    checkAuth()
+  }, [navigate])
 
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 py-8 w-full h-full">

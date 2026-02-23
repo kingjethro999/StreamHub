@@ -7,9 +7,7 @@ export function Header() {
   return (
     <header className="border-b border-border px-4 md:px-6 py-4 flex items-center justify-between bg-card/50 backdrop-blur-sm">
       <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-        <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-          S
-        </div>
+        <img src="/mylogo.png" alt="StreamHub Logo" className="w-10 h-10 object-contain" />
         <h1 className="text-2xl font-bold text-foreground">StreamHub</h1>
       </Link>
       <div className="flex items-center gap-4">

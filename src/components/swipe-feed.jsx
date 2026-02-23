@@ -38,7 +38,7 @@ export function SwipeFeed() {
 
     if (loading) {
         return (
-            <div className="h-full flex items-center justify-center bg-background">
+            <div className="absolute inset-0 flex items-center justify-center bg-background">
                 <div className="animate-pulse flex flex-col items-center gap-4">
                     <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
                     <p className="text-muted-foreground font-medium">Loading feed...</p>

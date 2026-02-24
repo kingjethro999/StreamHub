@@ -37,7 +37,7 @@ export default function Profile() {
 
       if (user) {
         setUser(user)
-        const { data: profileData } = await supabase.from("channels").select("*").eq("user_id", user.id).single()
+        const { data: profileData } = await supabase.from("channels").select("*").eq("creator_id", user.id).maybeSingle()
 
         if (profileData) {
           setName(profileData.name || "")
@@ -130,7 +130,7 @@ export default function Profile() {
       const { data: existingChannel, error: checkError } = await supabase
         .from("channels")
         .select("id")
-        .eq("user_id", user.id)
+        .eq("creator_id", user.id)
         .maybeSingle()
 
       if (checkError) {
@@ -150,14 +150,14 @@ export default function Profile() {
             contact_email: contactEmail,
             links
           })
-          .eq("user_id", user.id)
+          .eq("creator_id", user.id)
         if (error) throw error
       } else {
         // Insert new channel
         const { error } = await supabase
           .from("channels")
           .insert({
-            user_id: user.id,
+            creator_id: user.id,
             name: name || "My Channel", // Provides a fallback name to avoid DB constraints if any
             handle: formattedHandle || `@user-${user.id.substring(0, 6)}`,
             description,

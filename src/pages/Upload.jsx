@@ -55,8 +55,8 @@ export default function Upload() {
             const { data: channelData } = await supabase
                 .from("channels")
                 .select("id")
-                .eq("user_id", user.id)
-                .single()
+                .eq("creator_id", user.id)
+                .maybeSingle()
 
             const channelId = channelData?.id
 

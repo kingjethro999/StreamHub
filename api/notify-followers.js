@@ -31,14 +31,14 @@ export default async function handler(req, res) {
         // Find all users following this channel
         const { data: followers, error: followError } = await supabase
             .from("follows")
-            .select("user_id")
+            .select("follower_id")
             .eq("channel_id", channelId);
 
         if (followError || !followers || followers.length === 0) {
             return res.status(200).json({ message: "No followers found to notify" });
         }
 
-        const followerUserIds = followers.map((f) => f.user_id);
+        const followerUserIds = followers.map((f) => f.follower_id);
         const emails = [];
 
         // Fetch their emails from auth.users (Requires Service Role Key)

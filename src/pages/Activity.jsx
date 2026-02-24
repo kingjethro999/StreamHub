@@ -19,7 +19,7 @@ export default function Activity() {
 
       if (user) {
         // Fetch user's activity
-        const { data } = await supabase.from("follows").select("*, channel:channels(*)").eq("user_id", user.id)
+        const { data } = await supabase.from("follows").select("*, channel:channels(*)").eq("follower_id", user.id)
 
         setActivities(data || [])
       } else {

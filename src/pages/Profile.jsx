@@ -127,11 +127,15 @@ export default function Profile() {
       }
 
       // Check if channel already exists
-      const { data: existingChannel } = await supabase
+      const { data: existingChannel, error: checkError } = await supabase
         .from("channels")
         .select("id")
         .eq("user_id", user.id)
-        .single()
+        .maybeSingle()
+
+      if (checkError) {
+        throw checkError
+      }
 
       if (existingChannel) {
         // Update existing channel
@@ -167,7 +171,7 @@ export default function Profile() {
       alert("Profile published successfully!")
     } catch (err) {
       console.error(err)
-      alert("Failed to publish profile updates.")
+      alert("Failed to publish profile updates: " + (err.message || "Unknown error"))
     } finally {
       setSaving(false)
     }

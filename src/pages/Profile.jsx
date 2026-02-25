@@ -12,6 +12,7 @@ import { Input } from "../components/ui/input"
 export default function Profile() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
+  const [channelId, setChannelId] = useState(null)
 
   // Form State
   const [name, setName] = useState("")
@@ -40,6 +41,7 @@ export default function Profile() {
         const { data: profileData } = await supabase.from("channels").select("*").eq("creator_id", user.id).maybeSingle()
 
         if (profileData) {
+          setChannelId(profileData.id)
           setName(profileData.name || "")
           setHandle(profileData.handle || "")
           setDescription(profileData.description || "")
@@ -154,7 +156,7 @@ export default function Profile() {
         if (error) throw error
       } else {
         // Insert new channel
-        const { error } = await supabase
+        const { data: newChannel, error } = await supabase
           .from("channels")
           .insert({
             creator_id: user.id,
@@ -166,7 +168,10 @@ export default function Profile() {
             contact_email: contactEmail,
             links
           })
+          .select("id")
+          .single()
         if (error) throw error
+        if (newChannel) setChannelId(newChannel.id)
       }
       alert("Profile published successfully!")
     } catch (err) {
@@ -177,7 +182,7 @@ export default function Profile() {
     }
   }
 
-  const channelUrlText = user ? `${window.location.origin}/channel/${user.id}` : ""
+  const channelUrlText = channelId ? `${window.location.origin}/channel/${channelId}` : ""
 
   if (loading) return null
 
@@ -198,9 +203,9 @@ export default function Profile() {
         </div>
         <nav className="flex-1 py-4 space-y-2">
           <Button variant="ghost" className="w-full justify-start text-primary bg-primary/10">Channel customization</Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground">Dashboard</Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground">Content</Button>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground hover:text-foreground">Analytics</Button>
+          <Button variant="ghost" onClick={() => alert("Dashboard coming soon!")} className="w-full justify-start text-muted-foreground hover:text-foreground">Dashboard</Button>
+          <Button variant="ghost" onClick={() => navigate("/upload")} className="w-full justify-start text-muted-foreground hover:text-foreground">Content</Button>
+          <Button variant="ghost" onClick={() => alert("Analytics coming soon!")} className="w-full justify-start text-muted-foreground hover:text-foreground">Analytics</Button>
         </nav>
         <div className="pt-4 border-t border-border">
           <Button onClick={handleLogout} variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10">
@@ -215,7 +220,10 @@ export default function Profile() {
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border px-6 py-4 flex items-center justify-between">
           <h1 className="text-2xl font-bold">Channel customisation</h1>
           <div className="flex items-center gap-3">
-            <Button variant="outline" className="hidden sm:flex" onClick={() => navigate(`/channel/${user.id}`)}>
+            <Button variant="outline" className="hidden sm:flex" onClick={() => {
+              if (channelId) navigate(`/channel/${channelId}`)
+              else alert("Please publish your channel first!")
+            }}>
               View channel
             </Button>
             <Button onClick={handlePublish} disabled={saving || uploadingImage} className="min-w-[100px]">

@@ -91,7 +91,7 @@ export function CommentsPanel({ streamId, isOpen, onClose }) {
             />
 
             {/* Slide-over Panel */}
-            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-card border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            <div className="fixed top-0 right-0 z-50 w-full max-w-sm h-[100dvh] bg-card border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
                 {/* Header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b border-border">
                     <h2 className="text-lg font-bold">Comments <span className="text-muted-foreground text-sm font-normal">({comments.length})</span></h2>

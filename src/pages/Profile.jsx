@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { createClient } from "../lib/supabase/client"
-import { LogOut, UploadCloud, Copy, Plus, Trash2, Check, ExternalLink } from "lucide-react"
+import { LogOut, UploadCloud, Copy, Plus, Trash2, Check, ExternalLink, Play, BarChart3, Users, Video, Eye } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card } from "../components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar"
@@ -13,6 +13,9 @@ export default function Profile() {
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [channelId, setChannelId] = useState(null)
+
+  const [activeTab, setActiveTab] = useState("customization")
+  const [streams, setStreams] = useState([])
 
   // Form State
   const [name, setName] = useState("")
@@ -49,6 +52,17 @@ export default function Profile() {
           setBannerUrl(profileData.banner_url || "")
           setContactEmail(profileData.contact_email || "")
           setLinks(profileData.links || [])
+
+          // Fetch user streams
+          const { data: streamsData } = await supabase
+            .from("streams")
+            .select("*")
+            .eq("channel_id", profileData.id)
+            .order("created_at", { ascending: false })
+
+          if (streamsData) {
+            setStreams(streamsData)
+          }
         }
       } else {
         navigate("/auth/login")
@@ -202,10 +216,10 @@ export default function Profile() {
           </div>
         </div>
         <nav className="flex-1 py-4 space-y-2">
-          <Button variant="ghost" className="w-full justify-start text-primary bg-primary/10">Channel customization</Button>
-          <Button variant="ghost" onClick={() => alert("Dashboard coming soon!")} className="w-full justify-start text-muted-foreground hover:text-foreground">Dashboard</Button>
-          <Button variant="ghost" onClick={() => navigate("/upload")} className="w-full justify-start text-muted-foreground hover:text-foreground">Content</Button>
-          <Button variant="ghost" onClick={() => alert("Analytics coming soon!")} className="w-full justify-start text-muted-foreground hover:text-foreground">Analytics</Button>
+          <Button variant="ghost" onClick={() => setActiveTab("customization")} className={`w-full justify-start ${activeTab === "customization" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}>Channel customization</Button>
+          <Button variant="ghost" onClick={() => setActiveTab("dashboard")} className={`w-full justify-start ${activeTab === "dashboard" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}>Dashboard</Button>
+          <Button variant="ghost" onClick={() => setActiveTab("content")} className={`w-full justify-start ${activeTab === "content" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}>Content</Button>
+          <Button variant="ghost" onClick={() => setActiveTab("analytics")} className={`w-full justify-start ${activeTab === "analytics" ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-foreground"}`}>Analytics</Button>
         </nav>
         <div className="pt-4 border-t border-border">
           <Button onClick={handleLogout} variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10">
@@ -218,7 +232,7 @@ export default function Profile() {
       <div className="flex-1 overflow-y-auto w-full relative">
         {/* Top Bar Actions */}
         <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border px-6 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Channel customisation</h1>
+          <h1 className="text-2xl font-bold capitalize">{activeTab === 'customization' ? 'Channel customisation' : activeTab}</h1>
           <div className="flex items-center gap-3">
             <Button variant="outline" className="hidden sm:flex" onClick={() => {
               if (channelId) navigate(`/channel/${channelId}`)
@@ -226,183 +240,259 @@ export default function Profile() {
             }}>
               View channel
             </Button>
-            <Button onClick={handlePublish} disabled={saving || uploadingImage} className="min-w-[100px]">
-              {saving ? "Publishing..." : "Publish"}
-            </Button>
+            {activeTab === 'customization' && (
+              <Button onClick={handlePublish} disabled={saving || uploadingImage} className="min-w-[100px]">
+                {saving ? "Publishing..." : "Publish"}
+              </Button>
+            )}
+            {activeTab === 'content' && (
+              <Button onClick={() => navigate("/upload")} className="min-w-[100px]">
+                <Plus size={16} className="mr-2" /> Upload
+              </Button>
+            )}
           </div>
         </div>
 
         <div className="max-w-4xl mx-auto p-6 space-y-12 pb-24">
 
-          {/* Branding Section */}
-          <section>
-            <h2 className="text-xl font-bold mb-6">Branding</h2>
-            <div className="space-y-8">
+          {activeTab === 'customization' && (
+            <>
+              {/* Branding Section */}
+              <section>
+                <h2 className="text-xl font-bold mb-6">Branding</h2>
+                <div className="space-y-8">
 
-              {/* Avatar Upload */}
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-6 items-start p-6 bg-card border border-border rounded-xl">
-                <div>
-                  <h3 className="font-semibold mb-1">Picture</h3>
-                  <p className="text-sm text-muted-foreground">Your profile picture will appear next to your videos and comments.</p>
-                </div>
-                <div className="flex flex-col sm:flex-row items-center gap-6">
-                  <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
-                    <AvatarImage src={avatarUrl} className="object-cover" />
-                    <AvatarFallback className="bg-muted text-4xl">{name?.[0]?.toUpperCase() || "U"}</AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-3 flex-1 w-full">
-                    <p className="text-xs text-muted-foreground">It's recommended to use a picture that's at least 98x98 pixels and 4MB or less. Use a PNG or GIF (no animations) file.</p>
-                    <div className="flex gap-2">
-                      <input type="file" ref={avatarInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, 'avatar')} />
-                      <Button variant="secondary" onClick={() => avatarInputRef.current?.click()} disabled={uploadingImage}>
-                        {avatarUrl ? "Change" : "Upload"}
-                      </Button>
-                      {avatarUrl && (
-                        <Button variant="ghost" onClick={() => setAvatarUrl("")} className="text-destructive">Remove</Button>
-                      )}
+                  {/* Avatar Upload */}
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-6 items-start p-6 bg-card border border-border rounded-xl">
+                    <div>
+                      <h3 className="font-semibold mb-1">Picture</h3>
+                      <p className="text-sm text-muted-foreground">Your profile picture will appear next to your videos and comments.</p>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Banner Upload */}
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-6 items-start p-6 bg-card border border-border rounded-xl">
-                <div>
-                  <h3 className="font-semibold mb-1">Banner image</h3>
-                  <p className="text-sm text-muted-foreground">This image will appear across the top of your channel.</p>
-                </div>
-                <div className="flex flex-col gap-4">
-                  <div className="aspect-[16/4] w-full bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden group relative">
-                    {bannerUrl ? (
-                      <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="text-center text-muted-foreground flex flex-col items-center">
-                        <UploadCloud className="mb-2 opacity-50" size={32} />
-                        <span className="text-sm font-medium">No banner set</span>
+                    <div className="flex flex-col sm:flex-row items-center gap-6">
+                      <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
+                        <AvatarImage src={avatarUrl} className="object-cover" />
+                        <AvatarFallback className="bg-muted text-4xl">{name?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                      </Avatar>
+                      <div className="space-y-3 flex-1 w-full">
+                        <p className="text-xs text-muted-foreground">It's recommended to use a picture that's at least 98x98 pixels and 4MB or less. Use a PNG or GIF (no animations) file.</p>
+                        <div className="flex gap-2">
+                          <input type="file" ref={avatarInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, 'avatar')} />
+                          <Button variant="secondary" onClick={() => avatarInputRef.current?.click()} disabled={uploadingImage}>
+                            {avatarUrl ? "Change" : "Upload"}
+                          </Button>
+                          {avatarUrl && (
+                            <Button variant="ghost" onClick={() => setAvatarUrl("")} className="text-destructive">Remove</Button>
+                          )}
+                        </div>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer" onClick={() => bannerInputRef.current?.click()}>
-                      <span className="text-white font-medium flex items-center gap-2"><UploadCloud size={20} /> Upload new banner</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground max-w-sm">For the best results on all devices, use an image that's at least 2048 x 1152 pixels and 6MB or less.</p>
-                    <div className="flex gap-2">
-                      <input type="file" ref={bannerInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, 'banner')} />
-                      <Button variant="secondary" size="sm" onClick={() => bannerInputRef.current?.click()} disabled={uploadingImage}>
-                        {bannerUrl ? "Change" : "Upload"}
-                      </Button>
-                      {bannerUrl && (
-                        <Button variant="ghost" size="sm" onClick={() => setBannerUrl("")} className="text-destructive">Remove</Button>
-                      )}
+
+                  {/* Banner Upload */}
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-6 items-start p-6 bg-card border border-border rounded-xl">
+                    <div>
+                      <h3 className="font-semibold mb-1">Banner image</h3>
+                      <p className="text-sm text-muted-foreground">This image will appear across the top of your channel.</p>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                      <div className="aspect-[16/4] w-full bg-muted rounded-lg border-2 border-dashed border-border flex items-center justify-center overflow-hidden group relative">
+                        {bannerUrl ? (
+                          <img src={bannerUrl} alt="Banner" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="text-center text-muted-foreground flex flex-col items-center">
+                            <UploadCloud className="mb-2 opacity-50" size={32} />
+                            <span className="text-sm font-medium">No banner set</span>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer" onClick={() => bannerInputRef.current?.click()}>
+                          <span className="text-white font-medium flex items-center gap-2"><UploadCloud size={20} /> Upload new banner</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-muted-foreground max-w-sm">For the best results on all devices, use an image that's at least 2048 x 1152 pixels and 6MB or less.</p>
+                        <div className="flex gap-2">
+                          <input type="file" ref={bannerInputRef} className="hidden" accept="image/*" onChange={(e) => handleImageChange(e, 'banner')} />
+                          <Button variant="secondary" size="sm" onClick={() => bannerInputRef.current?.click()} disabled={uploadingImage}>
+                            {bannerUrl ? "Change" : "Upload"}
+                          </Button>
+                          {bannerUrl && (
+                            <Button variant="ghost" size="sm" onClick={() => setBannerUrl("")} className="text-destructive">Remove</Button>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
+              </section>
+
+              {/* Basic Info Section */}
+              <section>
+                <h2 className="text-xl font-bold mb-6">Basic info</h2>
+                <div className="space-y-6">
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Name</label>
+                    <p className="text-xs text-muted-foreground mb-1">Choose a channel name that represents you and your content.</p>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Channel Name"
+                      className="max-w-2xl bg-card"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Handle</label>
+                    <p className="text-xs text-muted-foreground mb-1">Choose your unique handle by adding letters and numbers.</p>
+                    <Input
+                      value={handle}
+                      onChange={(e) => setHandle(e.target.value)}
+                      placeholder="@yourhandle"
+                      className="max-w-2xl bg-card"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Description</label>
+                    <p className="text-xs text-muted-foreground mb-1">Tell viewers about your channel. Your description will appear in the About section.</p>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Welcome to my channel! Here we discuss..."
+                      className="w-full max-w-2xl min-h-[160px] flex rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold">Channel URL</label>
+                    <p className="text-xs text-muted-foreground mb-1">This is the standard web address for your channel.</p>
+                    <div className="flex gap-2 max-w-2xl">
+                      <Input
+                        value={channelUrlText}
+                        readOnly
+                        className="bg-muted text-muted-foreground"
+                      />
+                      <Button variant="secondary" onClick={() => navigator.clipboard.writeText(channelUrlText)} title="Copy URL">
+                        <Copy size={18} />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Links Array */}
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div>
+                      <label className="text-sm font-semibold">Links</label>
+                      <p className="text-xs text-muted-foreground mb-4">Share external links with your viewers. They'll be visible on your channel profile.</p>
+                    </div>
+
+                    <div className="space-y-3 max-w-3xl">
+                      {links.map((link, idx) => (
+                        <div key={idx} className="flex gap-2 items-start group">
+                          <Input
+                            placeholder="Link title (e.g. My Website)"
+                            value={link.title}
+                            onChange={(e) => updateLink(idx, 'title', e.target.value)}
+                            className="w-1/3 bg-card"
+                          />
+                          <Input
+                            placeholder="URL"
+                            value={link.url}
+                            onChange={(e) => updateLink(idx, 'url', e.target.value)}
+                            className="flex-1 bg-card"
+                          />
+                          <Button variant="ghost" size="icon" onClick={() => removeLink(idx)} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-destructive hover:bg-destructive/10">
+                            <Trash2 size={18} />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button variant="ghost" className="text-primary hover:text-primary hover:bg-primary/10 pl-2" onClick={addLink}>
+                        <Plus size={18} className="mr-2" /> Add link
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Contact Info */}
+                  <div className="space-y-2 pt-4 border-t border-border">
+                    <label className="text-sm font-semibold">Contact info</label>
+                    <p className="text-xs text-muted-foreground mb-1">Let people know how to contact you with business enquiries.</p>
+                    <Input
+                      type="email"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                      placeholder="Email address"
+                      className="max-w-md bg-card"
+                    />
+                  </div>
+
+                </div>
+              </section>
+            </>
+          )}
+
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold mb-6">Channel Overview</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="p-6 flex flex-col items-center justify-center text-center space-y-2 border-border shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full text-primary"><Users size={24} /></div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Subscribers</h3>
+                  <p className="text-3xl font-bold">0</p>
+                </Card>
+                <Card className="p-6 flex flex-col items-center justify-center text-center space-y-2 border-border shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full text-primary"><Video size={24} /></div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Total Videos</h3>
+                  <p className="text-3xl font-bold">{streams.length}</p>
+                </Card>
+                <Card className="p-6 flex flex-col items-center justify-center text-center space-y-2 border-border shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full text-primary"><Eye size={24} /></div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Total Views</h3>
+                  <p className="text-3xl font-bold">{streams.reduce((acc, curr) => acc + (curr.views_count || 0), 0)}</p>
+                </Card>
               </div>
             </div>
-          </section>
+          )}
 
-          {/* Basic Info Section */}
-          <section>
-            <h2 className="text-xl font-bold mb-6">Basic info</h2>
+          {activeTab === 'content' && (
             <div className="space-y-6">
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Name</label>
-                <p className="text-xs text-muted-foreground mb-1">Choose a channel name that represents you and your content.</p>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Channel Name"
-                  className="max-w-2xl bg-card"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Handle</label>
-                <p className="text-xs text-muted-foreground mb-1">Choose your unique handle by adding letters and numbers.</p>
-                <Input
-                  value={handle}
-                  onChange={(e) => setHandle(e.target.value)}
-                  placeholder="@yourhandle"
-                  className="max-w-2xl bg-card"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Description</label>
-                <p className="text-xs text-muted-foreground mb-1">Tell viewers about your channel. Your description will appear in the About section.</p>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Welcome to my channel! Here we discuss..."
-                  className="w-full max-w-2xl min-h-[160px] flex rounded-md border border-input bg-card px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold">Channel URL</label>
-                <p className="text-xs text-muted-foreground mb-1">This is the standard web address for your channel.</p>
-                <div className="flex gap-2 max-w-2xl">
-                  <Input
-                    value={channelUrlText}
-                    readOnly
-                    className="bg-muted text-muted-foreground"
-                  />
-                  <Button variant="secondary" onClick={() => navigator.clipboard.writeText(channelUrlText)} title="Copy URL">
-                    <Copy size={18} />
-                  </Button>
+              <h2 className="text-xl font-bold mb-6">Your Content</h2>
+              {streams.length === 0 ? (
+                <div className="text-center py-20 text-muted-foreground border-2 border-dashed border-border rounded-xl">
+                  <Video size={48} className="mx-auto mb-4 opacity-50" />
+                  <p className="mb-4">You haven't uploaded any videos yet.</p>
+                  <Button onClick={() => navigate("/upload")}>Upload your first video</Button>
                 </div>
-              </div>
-
-              {/* Links Array */}
-              <div className="space-y-4 pt-4 border-t border-border">
-                <div>
-                  <label className="text-sm font-semibold">Links</label>
-                  <p className="text-xs text-muted-foreground mb-4">Share external links with your viewers. They'll be visible on your channel profile.</p>
-                </div>
-
-                <div className="space-y-3 max-w-3xl">
-                  {links.map((link, idx) => (
-                    <div key={idx} className="flex gap-2 items-start group">
-                      <Input
-                        placeholder="Link title (e.g. My Website)"
-                        value={link.title}
-                        onChange={(e) => updateLink(idx, 'title', e.target.value)}
-                        className="w-1/3 bg-card"
-                      />
-                      <Input
-                        placeholder="URL"
-                        value={link.url}
-                        onChange={(e) => updateLink(idx, 'url', e.target.value)}
-                        className="flex-1 bg-card"
-                      />
-                      <Button variant="ghost" size="icon" onClick={() => removeLink(idx)} className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 text-destructive hover:bg-destructive/10">
-                        <Trash2 size={18} />
-                      </Button>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {streams.map(stream => (
+                    <div key={stream.id} className="group relative aspect-[9/16] bg-black rounded-xl overflow-hidden cursor-pointer border border-border shadow-sm hover:ring-2 ring-primary transition-all" onClick={() => navigate(`/stream/${stream.id}`)}>
+                      <img src={stream.thumbnail_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&h=888&fit=crop"} alt={stream.title} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-4">
+                        <p className="text-white font-medium text-sm line-clamp-2 mb-2 leading-tight">{stream.title}</p>
+                        <div className="flex items-center text-white/90 text-xs font-semibold">
+                          <Play size={14} className="mr-1.5" />
+                          <span>{stream.views_count || 0}</span>
+                        </div>
+                      </div>
                     </div>
                   ))}
-                  <Button variant="ghost" className="text-primary hover:text-primary hover:bg-primary/10 pl-2" onClick={addLink}>
-                    <Plus size={18} className="mr-2" /> Add link
-                  </Button>
                 </div>
-              </div>
-
-              {/* Contact Info */}
-              <div className="space-y-2 pt-4 border-t border-border">
-                <label className="text-sm font-semibold">Contact info</label>
-                <p className="text-xs text-muted-foreground mb-1">Let people know how to contact you with business enquiries.</p>
-                <Input
-                  type="email"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                  placeholder="Email address"
-                  className="max-w-md bg-card"
-                />
-              </div>
-
+              )}
             </div>
-          </section>
+          )}
+
+          {activeTab === 'analytics' && (
+            <div className="space-y-6">
+              <h2 className="text-xl font-bold mb-6">Channel Analytics</h2>
+              <Card className="p-8 text-center py-24 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center">
+                <div className="p-6 bg-muted/50 rounded-full mb-6">
+                  <BarChart3 size={48} className="text-muted-foreground opacity-70" />
+                </div>
+                <h3 className="text-xl font-bold mb-3">Detailed Analytics Coming Soon</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">We are building out advanced charts to help you track your channel's exact performance over time.</p>
+              </Card>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

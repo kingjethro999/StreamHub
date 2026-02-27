@@ -74,6 +74,8 @@ function SwipeFeedItem({ stream }) {
     const containerRef = useRef(null)
     const [isPlaying, setIsPlaying] = useState(false)
     const [liked, setLiked] = useState(false)
+    const [likeCount, setLikeCount] = useState(stream.likes_count || 0)
+    const [isLiking, setIsLiking] = useState(false)
     const [showComments, setShowComments] = useState(false)
     const [showShare, setShowShare] = useState(false)
     const [isRemixing, setIsRemixing] = useState(false)
@@ -82,6 +84,27 @@ function SwipeFeedItem({ stream }) {
 
     // Try to use video_url or assume thumbnail_url might hold video if uploaded wrongly without the column
     const videoSrc = stream.video_url || stream.thumbnail_url
+
+    useEffect(() => {
+        const checkLikeStatus = async () => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data, error } = await supabase
+                .from('likes')
+                .select('id')
+                .eq('stream_id', stream.id)
+                .eq('user_id', user.id)
+                .maybeSingle()
+
+            if (data && !error) {
+                setLiked(true)
+            }
+        }
+
+        checkLikeStatus()
+    }, [stream.id])
 
     useEffect(() => {
         const options = {
@@ -132,9 +155,50 @@ function SwipeFeedItem({ stream }) {
         }
     }
 
-    const handleLike = (e) => {
+    const handleLike = async (e) => {
         e.stopPropagation()
-        setLiked(!liked)
+        if (isLiking) return
+
+        setIsLiking(true)
+        const supabase = createClient()
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) {
+                alert("Log in to like videos!")
+                setIsLiking(false)
+                return
+            }
+
+            if (liked) {
+                // Unlike
+                const { error } = await supabase
+                    .from('likes')
+                    .delete()
+                    .match({ stream_id: stream.id, user_id: user.id })
+
+                if (!error) {
+                    setLiked(false)
+                    setLikeCount(prev => Math.max(0, prev - 1))
+                }
+            } else {
+                // Like
+                const { error } = await supabase
+                    .from('likes')
+                    .insert({ stream_id: stream.id, user_id: user.id })
+
+                if (!error || error.code === '23505') { // 23505 is unique violation, meaning already liked
+                    setLiked(true)
+                    setLikeCount(prev => prev + 1)
+                } else if (error.code === '42P01') {
+                    alert("Run the likes SQL script to create the table!")
+                }
+            }
+        } catch (err) {
+            console.error("Like failed:", err)
+        } finally {
+            setIsLiking(false)
+        }
     }
 
     const handleRemix = async (e) => {
@@ -189,17 +253,17 @@ function SwipeFeedItem({ stream }) {
                 <video
                     ref={videoRef}
                     src={videoSrc}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover md:object-contain bg-black"
                     loop
                     playsInline
                     poster={stream.thumbnail_url}
                 />
             ) : (
-                <div className="relative w-full h-full">
+                <div className="relative w-full h-full bg-black">
                     <img
                         src={stream.thumbnail_url || "/placeholder.svg?height=1920&width=1080"}
                         alt={stream.title}
-                        className="w-full h-full object-cover opacity-90"
+                        className="w-full h-full object-cover md:object-contain opacity-90"
                     />
                     <div className="absolute inset-0 flex items-center justify-center">
                         <span className="bg-black/50 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm font-medium">Image/Thumbnail</span>
@@ -234,7 +298,7 @@ function SwipeFeedItem({ stream }) {
                         <Heart size={22} className={liked ? "text-red-500 fill-red-500" : "text-white"} />
                     </div>
                     <span className="text-white text-[11px] font-bold drop-shadow-md">
-                        {formatViewers(stream.viewers_count + (liked ? 1 : 0))}
+                        {formatViewers(likeCount)}
                     </span>
                 </div>
 

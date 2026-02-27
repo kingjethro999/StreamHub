@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build",
-    "dev": "vite dev",
+    "build": "node api.js && vite build",
+    "dev": "node api.js && vite dev",
     "lint": "eslint .",
-    "start": "vite start"
+    "start": "node api.js && vite start"
   },
   "dependencies": {
     "@cloudinary/react": "^1.14.4",

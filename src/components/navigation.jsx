@@ -1,5 +1,5 @@
 import { useLocation, Link } from "react-router-dom"
-import { Home, Search, Video, PlusSquare, Bell, User } from "lucide-react"
+import { Home, Search, PlusSquare, Bell, User } from "lucide-react"
 
 export function Navigation() {
   const location = useLocation()

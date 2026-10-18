@@ -1,0 +1,49 @@
+import js from "@eslint/js"
+import globals from "globals"
+import reactHooks from "eslint-plugin-react-hooks"
+import reactRefresh from "eslint-plugin-react-refresh"
+
+// eslint-plugin-react-hooks v6+ folds the React Compiler lint rules into its
+// `recommended` configs. This codebase predates the compiler, so we opt in to
+// only the two classic correctness rules instead of the full compiler set.
+const hooksRules = {
+  "react-hooks/rules-of-hooks": "error",
+  "react-hooks/exhaustive-deps": "warn",
+}
+
+export default [
+  {
+    ignores: ["dist", "node_modules", "pnpm-lock.yaml"],
+  },
+  {
+    files: ["**/*.{js,jsx}"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+      globals: { ...globals.browser, ...globals.node },
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+      },
+    },
+    plugins: {
+      "react-hooks": reactHooks,
+      "react-refresh": reactRefresh,
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      ...hooksRules,
+      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      "no-unused-vars": ["error", { varsIgnorePattern: "^_", argsIgnorePattern: "^_" }],
+      "no-empty": ["error", { allowEmptyCatch: true }],
+    },
+  },
+  {
+    files: ["server/**/*.js", "vite.config.js", "eslint.config.js"],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
+  },
+]

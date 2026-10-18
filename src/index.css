@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-@theme inline {
+/* Tailwind v4 defaults the `dark:` variant to prefers-color-scheme.
+   StreamHub toggles dark mode with a `.dark` class on <html> (see Settings). */
+@custom-variant dark (&:is(.dark *));
+
+@theme {
   --font-sans: "Inter", "Inter Fallback", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "Courier New", monospace;
 
@@ -33,7 +37,7 @@
 }
 
 * {
-  border-color: hsl(var(--color-border));
+  border-color: var(--color-border);
 }
 
 body {

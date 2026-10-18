@@ -2,52 +2,49 @@
 
 import { useState, useEffect } from "react"
 import { StreamCard } from "../components/stream-card"
-import { createClient } from "../lib/supabase/client"
-import { SearchIcon, X } from "lucide-react"
+import { listStreams } from "../lib/api"
+import { Search as SearchIcon, X } from "lucide-react"
 import { Input } from "../components/ui/input"
 import { useNavigate } from "react-router-dom"
+
+const TRENDING_LIMIT = 24
 
 export default function Search() {
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState("")
   const [streams, setStreams] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const searchStreams = async () => {
-      if (!searchQuery.trim()) {
-        setStreams([])
-        return
-      }
+    let cancelled = false
+    const trimmed = searchQuery.trim()
 
+    const run = async () => {
       setLoading(true)
-      const supabase = createClient()
-
       try {
-        const { data, error } = await supabase
-          .from("streams")
-          .select(`
-            *,
-            channel:channels(*)
-          `)
-          .eq("status", "live")
-          .ilike("title", `%${searchQuery}%`)
-
-        if (error) throw error
-        setStreams(data || [])
+        const data = trimmed
+          ? await listStreams({ q: trimmed, order: "created_at", dir: "desc", limit: 60 })
+          : await listStreams({ order: "views_count", dir: "desc", limit: TRENDING_LIMIT })
+        if (!cancelled) setStreams(data || [])
       } catch (error) {
         console.error("Error searching streams:", error)
+        if (!cancelled) setStreams([])
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
-    const timeoutId = setTimeout(searchStreams, 300)
-    return () => clearTimeout(timeoutId)
+    const timeoutId = setTimeout(run, 250)
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
   }, [searchQuery])
 
+  const isSearching = searchQuery.trim().length > 0
+
   return (
-    <div className="flex-1 overflow-y-auto px-4 md:px-6 py-8 w-full h-full">
+    <div className="flex-1 overflow-y-auto px-4 py-8 w-full h-full md:px-6">
       <div className="flex justify-end mb-4">
         <button
           onClick={() => navigate("/")}
@@ -59,7 +56,7 @@ export default function Search() {
       </div>
 
       <div className="max-w-3xl mx-auto mb-8">
-        <h1 className="text-3xl font-bold mb-6 text-balance">Search Streams</h1>
+        <h1 className="text-3xl font-bold mb-6 text-balance">Discover</h1>
 
         <div className="relative">
           <SearchIcon
@@ -68,7 +65,7 @@ export default function Search() {
           />
           <Input
             type="text"
-            placeholder="Search for streams..."
+            placeholder="Search shorts, creators, topics..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 py-6 text-lg"
@@ -76,40 +73,34 @@ export default function Search() {
         </div>
       </div>
 
+      {!isSearching && (
+        <h2 className="max-w-7xl mx-auto mb-4 text-xl font-bold">Trending now</h2>
+      )}
+
       {loading ? (
         <div className="text-center py-16">
-          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground font-medium">Searching the hub...</p>
+          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground font-medium">
+            {isSearching ? "Searching the hub..." : "Loading shorts..."}
+          </p>
         </div>
-      ) : searchQuery && streams.length === 0 ? (
+      ) : streams.length === 0 ? (
         <div className="py-24 flex flex-col items-center justify-center text-center">
           <img
             src="/workspace-desk-setup-streaming.jpg"
-            alt="Empty search results illustration"
+            alt="Empty search results"
             className="w-64 max-w-full mb-8 rounded-lg opacity-80 mix-blend-luminosity"
           />
           <h2 className="text-2xl font-bold mb-2">No results found</h2>
           <p className="text-muted-foreground max-w-sm mx-auto">
-            We couldn't find any streams matching "{searchQuery}". Try different keywords.
+            We couldn&apos;t find any shorts matching &ldquo;{searchQuery}&rdquo;. Try different keywords.
           </p>
         </div>
-      ) : streams.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-12">
+      ) : (
+        <div className="max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 pb-12 md:gap-4">
           {streams.map((stream) => (
             <StreamCard key={stream.id} stream={stream} />
           ))}
-        </div>
-      ) : (
-        <div className="py-24 flex flex-col items-center justify-center text-center">
-          <img
-            src="/workspace-desk-setup-streaming.jpg"
-            alt="Discover content illustration"
-            className="w-64 max-w-full mb-8 rounded-lg opacity-80 mix-blend-luminosity"
-          />
-          <h2 className="text-2xl font-bold mb-2">Discover Content</h2>
-          <p className="text-muted-foreground max-w-sm mx-auto">
-            Start typing to search for live programming, gaming streams, and more.
-          </p>
         </div>
       )}
     </div>

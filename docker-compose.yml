@@ -1,0 +1,29 @@
+version: "3.8"
+
+# Local development database for StreamHub.
+# Start with:  pnpm db:up        (docker-compose up -d)
+# Load schema: pnpm db:setup
+#
+# The host port defaults to 5434 to stay clear of a Postgres already on 5432.
+# Override it with POSTGRES_PORT in .env (and update DATABASE_URL to match).
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: streamhub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-streamhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-streamhub}
+      POSTGRES_DB: ${POSTGRES_DB:-streamhub}
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - streamhub_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-streamhub} -d ${POSTGRES_DB:-streamhub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  streamhub_pgdata:

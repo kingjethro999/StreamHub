@@ -1,8 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "../lib/supabase/client"
-import { Clock, X } from "lucide-react"
+import { getCurrentUser, getMyFollows } from "../lib/api"
+import { X } from "lucide-react"
 import { Card } from "../components/ui/card"
 import { useNavigate } from "react-router-dom"
 
@@ -12,23 +12,24 @@ export default function Activity() {
 
   useEffect(() => {
     const fetchActivities = async () => {
-      const supabase = createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      try {
+        const user = await getCurrentUser()
 
-      if (user) {
-        // Fetch user's activity
-        const { data } = await supabase.from("follows").select("*, channel:channels(*)").eq("follower_id", user.id)
+        if (!user) {
+          navigate("/auth/login")
+          return
+        }
 
+        // Fetch the channels this user follows
+        const data = await getMyFollows()
         setActivities(data || [])
-      } else {
-        navigate("/auth/login")
+      } catch (err) {
+        console.error("Failed to load activity:", err)
       }
     }
 
     fetchActivities()
-  }, [])
+  }, [navigate])
 
   return (
     <div className="flex-1 overflow-y-auto px-4 md:px-6 py-8 w-full h-full">

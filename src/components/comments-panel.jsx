@@ -1,11 +1,11 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "../lib/supabase/client"
+import { getCurrentUser, getComments, postComment } from "../lib/api"
 import { X, Send } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
 
-export function CommentsPanel({ streamId, isOpen, onClose }) {
+export function CommentsPanel({ streamId, isOpen, onClose, onCommentAdded }) {
     const [comments, setComments] = useState([])
     const [newComment, setNewComment] = useState("")
     const [loading, setLoading] = useState(true)
@@ -15,30 +15,16 @@ export function CommentsPanel({ streamId, isOpen, onClose }) {
         if (!isOpen) return
 
         const fetchComments = async () => {
-            const supabase = createClient()
             setLoading(true)
 
-            // Get user
-            const { data: { user: currentUser } } = await supabase.auth.getUser()
-            setUser(currentUser)
-
             try {
-                // Fetch comments with user profile info
-                const { data, error } = await supabase
-                    .from("comments")
-                    .select(`
-                        *,
-                        profiles(username, avatar_url)
-                    `)
-                    .eq("stream_id", streamId)
-                    .order("created_at", { ascending: false })
+                // Get user
+                const currentUser = await getCurrentUser()
+                setUser(currentUser)
 
-                if (error && error.code !== '42P01') {
-                    // 42P01 is undefined table (if user didn't run SQL yet)
-                    console.error("Error fetching comments:", error)
-                } else if (data) {
-                    setComments(data)
-                }
+                // Fetch comments with user profile info
+                const data = await getComments(streamId)
+                setComments(data || [])
             } catch (err) {
                 console.error("Failed to fetch comments", err)
             } finally {
@@ -53,30 +39,20 @@ export function CommentsPanel({ streamId, isOpen, onClose }) {
         e.preventDefault()
         if (!newComment.trim() || !user) return
 
-        const supabase = createClient()
         try {
-            const { data, error } = await supabase
-                .from("comments")
-                .insert({
-                    stream_id: streamId,
-                    user_id: user.id,
-                    content: newComment.trim()
-                })
-                .select(`*, profiles(username, avatar_url)`)
-                .single()
-
-            if (error) {
-                if (error.code === '42P01') {
-                    alert("Please run the db.sql script to create the 'comments' table!")
-                } else throw error
-            }
-
-            if (data) {
-                setComments([data, ...comments])
+            const comment = await postComment(streamId, newComment.trim())
+            if (comment) {
+                setComments([comment, ...comments])
                 setNewComment("")
+                onCommentAdded?.(comment)
             }
         } catch (err) {
-            console.error("Failed to post comment:", err)
+            if (err?.code === "42P01") {
+                alert("Database schema is missing — run `pnpm db:setup`.")
+            } else {
+                console.error("Failed to post comment:", err)
+                alert(err?.message || "Could not post comment")
+            }
         }
     }
 

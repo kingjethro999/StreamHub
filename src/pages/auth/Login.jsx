@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { createClient } from "../../lib/supabase/client"
+import { login } from "../../lib/api"
 import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
@@ -21,17 +21,12 @@ export default function Login() {
     setError("")
     setLoading(true)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
+    try {
+      await login(email, password)
       navigate("/")
+    } catch (err) {
+      setError(err?.message || "Could not sign in")
+      setLoading(false)
     }
   }
 

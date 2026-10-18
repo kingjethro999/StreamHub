@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { Button } from './ui/button';
 import { UploadCloud } from 'lucide-react';
 
 export default function CloudinaryUploadWidget({ uwConfig, setPublicId, setVideoUrl, setThumbnailUrl }) {

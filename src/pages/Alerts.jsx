@@ -1,9 +1,8 @@
 "use client"
 
 import { useEffect } from "react"
-import { createClient } from "../lib/supabase/client"
-import { Bell, X } from "lucide-react"
-import { Card } from "../components/ui/card"
+import { getCurrentUser } from "../lib/api"
+import { X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 export default function Alerts() {
@@ -11,8 +10,7 @@ export default function Alerts() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = await getCurrentUser()
       if (!user) {
         navigate("/auth/login")
       }

@@ -27,7 +27,8 @@ export default function Settings() {
   useEffect(() => {
     localStorage.setItem("setting_notifications", pushNotifications)
     if (pushNotifications) {
-      console.log("Email notifications enabled via GMAIL_SMTP_USER:", import.meta.env.VITE_GMAIL_SMTP_USER || "this.is.dev.space@gmail.com")
+      // Follower emails are sent by the API using the server's SMTP config.
+      console.log("Email notifications enabled.")
     }
   }, [pushNotifications])
 

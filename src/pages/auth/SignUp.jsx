@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { createClient } from "../../lib/supabase/client"
+import { register } from "../../lib/api"
 import { Button } from "../../components/ui/button"
 import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
@@ -22,24 +22,13 @@ export default function SignUp() {
     setError("")
     setLoading(true)
 
-    const supabase = createClient()
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: import.meta.env.VITE_SUPABASE_REDIRECT_URL || window.location.origin,
-        data: {
-          username,
-        },
-      },
-    })
-
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      // Direct redirect since we don't support email confirmation yet
+    try {
+      await register({ email, password, username })
+      // Sessions are issued immediately — no email confirmation flow yet.
       navigate("/")
+    } catch (err) {
+      setError(err?.message || "Could not create an account")
+      setLoading(false)
     }
   }
 

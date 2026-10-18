@@ -1,97 +1,156 @@
-# StreamHub - Nigerian Streaming Platform
+# StreamHub — Nigerian Streaming Platform
 
-A React-based streaming platform focused on Nigerian content creators.
+A vertical-video streaming platform for Nigerian creators. React + Vite frontend,
+Fastify + PostgreSQL backend.
 
 ## Features
 
-- Live streaming catalog with categories (Gaming, Music, Tech, Comedy, Entertainment)
-- User authentication with Supabase
-- Channel profiles and stream details
-- Premium subscription tiers
-- Search functionality
-- Activity tracking and notifications
+- Vertical swipe feed with a live-stream catalog and categories (Gaming, Music,
+  Technology, Comedy, Entertainment)
+- Email/password authentication with JWT sessions
+- Channel profiles, follows, likes, comments and reposts
+- Stream details, search, activity and alerts views
+- Profile dashboard with Cloudinary image/video uploads
+- "Going live" email notifications to a channel's followers
 
 ## Tech Stack
 
-- **React 18** - UI library
-- **React Router 6** - Client-side routing
-- **Vite** - Build tool and dev server
-- **Tailwind CSS 4** - Styling
-- **Supabase** - Backend and authentication
-- **Radix UI** - Accessible component primitives
-- **Lucide React** - Icons
+| Layer      | Technology                                            |
+| ---------- | ----------------------------------------------------- |
+| Frontend   | React 19, React Router 7, Vite 8, Tailwind CSS 4      |
+| UI         | shadcn/ui primitives on Radix UI, Lucide icons        |
+| Backend    | Fastify 5 (REST API + static host in production)      |
+| Database   | PostgreSQL 17 (Docker locally, any managed PG in prod)|
+| Auth       | JWT (`@fastify/jwt`) + bcrypt password hashing        |
+| Email      | Nodemailer (SMTP)                                     |
+| Media      | Cloudinary upload widget (unsigned, browser-side)     |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ installed
-- Supabase account and project
+- Node.js 20.6+ (the API uses `process.loadEnvFile`)
+- pnpm (`npm i -g pnpm`)
+- Docker + Docker Compose (for the local database)
 
 ### Installation
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+```bash
+# 1. Install dependencies
+pnpm install
 
-3. Create a `.env` file based on `.env.example` and add your Supabase credentials:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   VITE_SUPABASE_REDIRECT_URL=http://localhost:3000
-   ```
+# 2. Create your environment file
+cp .env.example .env
+#    …then edit .env if you want to change any values.
 
-4. Run the database migration scripts in Supabase:
-   - Run `scripts/001_create_profiles.sql`
-   - Run `scripts/002_seed_nigerian_content.sql`
+# 3. Start PostgreSQL in Docker
+pnpm db:up
 
-5. Start the development server:
-   ```bash
-   npm run dev
-   ```
+# 4. Create the schema and load demo data
+pnpm db:setup
 
-6. Open [http://localhost:3000](http://localhost:3000)
+# 5. Run the API and the Vite dev server together
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The API listens on
+`http://localhost:4000`, and Vite proxies `/api` requests to it.
+
+### Demo logins
+
+All seeded accounts use the password **`streamhub123`**.
+
+| Role   | Email                                                     |
+| ------ | --------------------------------------------------------- |
+| Viewer | `demo@streamhub.dev`                                      |
+| Creator| `tech@streamhub.dev`, `gaming@streamhub.dev`, `music@streamhub.dev`, `comedy@streamhub.dev`, `nollywood@streamhub.dev` |
+
+> To upload a stream you need a channel — sign in as a creator, open **Profile**,
+> fill in the form and hit **Publish**, then use **Upload**.
+
+## Configuration
+
+All configuration lives in `.env` (gitignored — see `.env.example` for the shape).
+
+| Variable         | Purpose                                                       |
+| ---------------- | ------------------------------------------------------------- |
+| `PORT`           | API port (default `4000`)                                     |
+| `CORS_ORIGIN`    | Allowed browser origin for the API (default `http://localhost:3000`) |
+| `DATABASE_URL`   | PostgreSQL connection string                                  |
+| `DATABASE_SSL`   | Set `true` for managed Postgres that requires TLS             |
+| `POSTGRES_*`     | Consumed by `docker-compose.yml` to create the local database || `JWT_SECRET`     | Signing key for session tokens — **change in production**     |
+| `JWT_EXPIRES_IN` | Token lifetime (default `7d`)                                 |
+| `SMTP_*`, `MAIL_FROM` | Follower notification email. Leave `SMTP_USER`/`SMTP_PASS` empty to disable |
+| `VITE_API_BASE_URL` | API base path used by the browser (default `/api`)         |
+| `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_UPLOAD_PRESET` | Cloudinary unsigned uploads |
+
+Variables prefixed with `VITE_` are bundled into the browser build — never put
+secrets there.
+
+If port `5432` is already in use (another local Postgres), change
+`POSTGRES_PORT` **and** the port inside `DATABASE_URL` to a free port, e.g.
+`5434`, then run `pnpm db:up && pnpm db:setup`.
+
+### Switching to a production database
+
+Point `DATABASE_URL` at your managed Postgres, set `DATABASE_SSL=true`, and run
+`pnpm db:migrate` once to create the schema. No other code changes are needed.
 
 ## Project Structure
 
 ```
-src/
-├── components/        # Reusable components
-│   ├── ui/           # UI component library (Radix + Tailwind)
-│   ├── header.jsx
-│   ├── navigation.jsx
-│   ├── stream-card.jsx
-│   ├── stream-catalog.jsx
-│   └── category-filter.jsx
-├── pages/            # Route pages
-│   ├── auth/         # Authentication pages
-│   ├── Home.jsx
-│   ├── Search.jsx
-│   ├── Profile.jsx
-│   ├── Premium.jsx
-│   └── ...
-├── lib/              # Utilities
-│   └── supabase/     # Supabase client setup
-├── App.jsx           # Main app component with routes
-├── main.jsx          # Application entry point
-└── index.css         # Global styles and Tailwind config
+server/
+├── index.js            # Fastify bootstrap, JWT, CORS, static hosting
+├── env.js              # Loads .env and exports config
+├── db.js               # pg connection pool + query helpers
+├── users.js            # password hashing / user helpers
+├── errors.js           # { error, code } response helpers
+├── routes/             # auth, channels, streams, comments, likes,
+│                       # reposts, follows, notify
+└── db/
+    ├── schema.sql      # canonical schema (tables, triggers, indexes)
+    ├── migrate.js      # applies schema.sql
+    └── seed.js         # demo creators, channels and streams
 
-scripts/              # Database migration scripts
-public/               # Static assets
+src/
+├── components/         # Layout, cards, feed, comments, share modal, ui/
+├── pages/              # Route pages (Route definitions in App.jsx)
+│   └── auth/           # Login, SignUp
+├── lib/
+│   ├── api/            # client.js (fetch wrapper) + index.js (domain calls)
+│   └── utils.js        # cn() class helper
+├── App.jsx             # Routes
+├── main.jsx            # Entry point
+└── index.css           # Tailwind theme tokens
 ```
 
 ## Available Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build locally
+| Script            | Description                                              |
+| ----------------- | -------------------------------------------------------- |
+| `pnpm dev`        | Run the API and Vite dev server together                 |
+| `pnpm dev:api`    | Run only the API (`node --watch server/index.js`)        |
+| `pnpm dev:web`    | Run only the Vite dev server                             |
+| `pnpm build`      | Build the frontend to `dist/`                            |
+| `pnpm start`      | Run the API, serving the built `dist/` in production     |
+| `pnpm lint`       | Lint the codebase with ESLint                            |
+| `pnpm db:up`      | Start the Docker PostgreSQL database                     |
+| `pnpm db:down`    | Stop the Docker PostgreSQL database                      |
+| `pnpm db:migrate` | Apply `server/db/schema.sql`                             |
+| `pnpm db:seed`    | Load demo data                                           |
+| `pnpm db:setup`   | `db:migrate` + `db:seed`                                 |
+
+## Deployment
+
+```bash
+pnpm install
+pnpm build          # emits dist/
+pnpm start          # Fastify serves the API and dist/ on $PORT
+```
+
+Set `NODE_ENV=production`, a strong `JWT_SECRET`, and your production
+`DATABASE_URL` (+ `DATABASE_SSL=true`) in the environment.
 
 ## License
 
 MIT
-```
-
-```mjs file="next.config.mjs" isDeleted="true"
-...deleted...

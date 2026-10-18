@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "../lib/supabase/client"
+import { getCurrentUser, getMyChannel, createStream, notifyFollowers } from "../lib/api"
 import { X, Loader2 } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card } from "../components/ui/card"
@@ -17,14 +17,13 @@ export default function Upload() {
     const [error, setError] = useState(null)
 
     // Cloudinary Widget state
-    const [publicId, setPublicId] = useState("")
+    const [_publicId, setPublicId] = useState("")
     const [videoUrl, setVideoUrl] = useState("")
     const [thumbnailUrl, setThumbnailUrl] = useState("")
 
     useEffect(() => {
         const checkAuth = async () => {
-            const supabase = createClient()
-            const { data: { user } } = await supabase.auth.getUser()
+            const user = await getCurrentUser()
             if (!user) {
                 navigate("/auth/login")
             }
@@ -43,58 +42,44 @@ export default function Upload() {
             setUploading(true)
             setError(null)
 
-            // Save to Supabase
-            const supabase = createClient()
-            const { data: { user } } = await supabase.auth.getUser()
-
+            const user = await getCurrentUser()
             if (!user) {
                 throw new Error("You must be logged in to upload")
             }
 
-            // Fetch the channel for the user
-            const { data: channelData } = await supabase
-                .from("channels")
-                .select("id")
-                .eq("creator_id", user.id)
-                .maybeSingle()
-
-            const channelId = channelData?.id
-
-            if (!channelId) {
+            // The user must have a channel before publishing anything.
+            const channel = await getMyChannel()
+            if (!channel) {
                 throw new Error("You must create a channel before uploading. Go to Settings to set up your profile.")
             }
 
-            const { data: streamData, error: dbError } = await supabase
-                .from("streams")
-                .insert({
-                    title,
-                    description,
-                    status: "live", // Mark as live so it shows up in the feed
-                    viewers_count: 0,
-                    thumbnail_url: thumbnailUrl,
-                    video_url: videoUrl,
-                    channel_id: channelId,
-                })
-                .select()
-                .single()
+            const stream = await createStream({
+                title,
+                description,
+                status: "live", // Mark as live so it shows up in the feed
+                viewers_count: 0,
+                thumbnail_url: thumbnailUrl,
+                video_url: videoUrl,
+                channel_id: channel.id,
+            })
 
-            if (dbError) throw dbError
-
-            // Trigger notification edge function (fire-and-forget so UI doesn't block)
-            fetch('/api/notify-followers', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    channelId: channelId,
-                    streamTitle: title,
-                    streamUrl: `${window.location.origin}/stream/${streamData.id}`
-                })
-            }).catch(e => console.error("Failed to trigger notifications", e))
+            // Notify followers (fire-and-forget so the UI doesn't block)
+            notifyFollowers({
+                channelId: channel.id,
+                streamTitle: title,
+                streamUrl: `${window.location.origin}/stream/${stream.id}`,
+            }).catch((e) => console.error("Failed to trigger notifications", e))
 
             navigate("/") // go back to feed on success
         } catch (err) {
             console.error(err)
-            setError(err.message || "An unexpected error occurred during saving")
+            if (err?.code === "NO_CHANNEL") {
+                setError("You must create a channel before uploading. Go to Settings to set up your profile.")
+            } else if (err?.code === "UNAUTHENTICATED") {
+                setError("You must be logged in to upload")
+            } else {
+                setError(err.message || "An unexpected error occurred during saving")
+            }
         } finally {
             setUploading(false)
         }

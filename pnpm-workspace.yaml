@@ -1,0 +1,28 @@
+# pnpm settings for StreamHub.
+#
+# pnpm 11+ reads these from pnpm-workspace.yaml (the `pnpm` field in
+# package.json is ignored). `allowBuilds` replaces the old
+# `onlyBuiltDependencies`; pnpm 11 removed that key entirely.
+#
+# Vite pulls in these packages, each of which has a lifecycle script that pnpm
+# will not run without explicit approval:
+#   - esbuild          postinstall verifies/downloads the platform binary
+#   - @parcel/watcher  install links or builds its native addon
+#   - less             upstream LESS compiler package
+allowBuilds:
+  esbuild: true
+  "@parcel/watcher": true
+  less: true
+
+# pnpm enforces a 24h "release cooldown" on new versions by default
+# (minimumReleaseAge: 1440). The project was set up with `--latest`, so these
+# three were newer than the cooldown when the lockfile was written and the
+# lockfile verification step rejects them. Excluding the exact versions lets
+# the install complete; the cooldown still applies to every other package.
+#
+# Maintenance: drop each entry once the version is more than 24h old and
+# re-run `pnpm install` (the entries are inert once they no longer resolve).
+minimumReleaseAgeExclude:
+  - eslint@10.13.0
+  - lucide-react@1.58.0
+  - nodemailer@10.1.2

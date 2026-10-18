@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useNavigate } from "react-router-dom"
-import { createClient } from "../lib/supabase/client"
+import { getChannel, getChannelStreams } from "../lib/api"
 import { StreamCard } from "../components/stream-card"
 import { X } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card } from "../components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar"
-import { Badge } from "../components/ui/badge"
 import { ExternalLink, Mail } from "lucide-react"
 
 export default function ChannelDetails() {
@@ -20,25 +19,11 @@ export default function ChannelDetails() {
 
   useEffect(() => {
     const fetchChannelData = async () => {
-      const supabase = createClient()
-
       try {
-        const { data: channelData, error: channelError } = await supabase
-          .from("channels")
-          .select("*")
-          .eq("id", id)
-          .single()
-
-        if (channelError) throw channelError
+        const channelData = await getChannel(id)
         setChannel(channelData)
 
-        const { data: streamsData, error: streamsError } = await supabase
-          .from("streams")
-          .select("*, channel:channels(*)")
-          .eq("channel_id", id)
-          .order("created_at", { ascending: false })
-
-        if (streamsError) throw streamsError
+        const streamsData = await getChannelStreams(id)
         setStreams(streamsData || [])
       } catch (error) {
         console.error("Error fetching channel data:", error)
@@ -143,7 +128,7 @@ export default function ChannelDetails() {
 
         {/* Channel Streams */}
         <div>
-          <h2 className="text-2xl font-bold mb-6">Recent Streams</h2>
+          <h2 className="text-2xl font-bold mb-6">Recent shorts</h2>
           {streams.length === 0 ? (
             <Card className="p-8 text-center flex flex-col items-center justify-center">
               <img
@@ -151,10 +136,10 @@ export default function ChannelDetails() {
                 alt="No streams available"
                 className="w-48 max-w-full mb-6 rounded-lg opacity-80 mix-blend-luminosity"
               />
-              <p className="text-muted-foreground">No streams available yet</p>
+              <p className="text-muted-foreground">No shorts published yet</p>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
               {streams.map((stream) => (
                 <StreamCard key={stream.id} stream={stream} />
               ))}

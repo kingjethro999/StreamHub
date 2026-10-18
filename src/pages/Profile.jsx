@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { createClient } from "../lib/supabase/client"
-import { LogOut, UploadCloud, Copy, Plus, Trash2, Check, ExternalLink, Play, BarChart3, Users, Video, Eye } from "lucide-react"
+import { getCurrentUser, logout, getMyChannel, saveMyChannel, getChannelStreams } from "../lib/api"
+import { LogOut, UploadCloud, Copy, Plus, Trash2, Play, BarChart3, Users, Video, Eye } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card } from "../components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar"
@@ -36,46 +36,43 @@ export default function Profile() {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      try {
+        const user = await getCurrentUser()
 
-      if (user) {
+        if (!user) {
+          navigate("/auth/login")
+          return
+        }
+
         setUser(user)
-        const { data: profileData } = await supabase.from("channels").select("*").eq("creator_id", user.id).maybeSingle()
 
-        if (profileData) {
-          setChannelId(profileData.id)
-          setName(profileData.name || "")
-          setHandle(profileData.handle || "")
-          setDescription(profileData.description || "")
-          setAvatarUrl(profileData.avatar_url || "")
-          setBannerUrl(profileData.banner_url || "")
-          setContactEmail(profileData.contact_email || "")
-          setLinks(profileData.links || [])
+        const channelData = await getMyChannel()
+        if (channelData) {
+          setChannelId(channelData.id)
+          setName(channelData.name || "")
+          setHandle(channelData.handle || "")
+          setDescription(channelData.description || "")
+          setAvatarUrl(channelData.avatar_url || "")
+          setBannerUrl(channelData.banner_url || "")
+          setContactEmail(channelData.contact_email || "")
+          setLinks(channelData.links || [])
 
           // Fetch user streams
-          const { data: streamsData } = await supabase
-            .from("streams")
-            .select("*")
-            .eq("channel_id", profileData.id)
-            .order("created_at", { ascending: false })
-
-          if (streamsData) {
-            setStreams(streamsData)
-          }
+          const streamsData = await getChannelStreams(channelData.id)
+          setStreams(streamsData || [])
         }
-      } else {
-        navigate("/auth/login")
+      } catch (err) {
+        console.error("Failed to load profile:", err)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     fetchUser()
   }, [navigate])
 
-  const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
+  const handleLogout = () => {
+    logout()
     navigate("/auth/login")
   }
 
@@ -133,7 +130,6 @@ export default function Profile() {
 
   const handlePublish = async () => {
     setSaving(true)
-    const supabase = createClient()
 
     try {
       // Format handle properly
@@ -142,51 +138,18 @@ export default function Profile() {
         formattedHandle = '@' + formattedHandle
       }
 
-      // Check if channel already exists
-      const { data: existingChannel, error: checkError } = await supabase
-        .from("channels")
-        .select("id")
-        .eq("creator_id", user.id)
-        .maybeSingle()
+      // Single upsert — creates the channel on first publish, updates it afterwards.
+      const saved = await saveMyChannel({
+        name: name || "My Channel",
+        handle: formattedHandle || (channelId ? undefined : `@user-${user.id.substring(0, 6)}`),
+        description,
+        avatar_url: avatarUrl,
+        banner_url: bannerUrl,
+        contact_email: contactEmail,
+        links,
+      })
+      setChannelId(saved.id)
 
-      if (checkError) {
-        throw checkError
-      }
-
-      if (existingChannel) {
-        // Update existing channel
-        const { error } = await supabase
-          .from("channels")
-          .update({
-            name,
-            handle: formattedHandle,
-            description,
-            avatar_url: avatarUrl,
-            banner_url: bannerUrl,
-            contact_email: contactEmail,
-            links
-          })
-          .eq("creator_id", user.id)
-        if (error) throw error
-      } else {
-        // Insert new channel
-        const { data: newChannel, error } = await supabase
-          .from("channels")
-          .insert({
-            creator_id: user.id,
-            name: name || "My Channel", // Provides a fallback name to avoid DB constraints if any
-            handle: formattedHandle || `@user-${user.id.substring(0, 6)}`,
-            description,
-            avatar_url: avatarUrl,
-            banner_url: bannerUrl,
-            contact_email: contactEmail,
-            links
-          })
-          .select("id")
-          .single()
-        if (error) throw error
-        if (newChannel) setChannelId(newChannel.id)
-      }
       alert("Profile published successfully!")
     } catch (err) {
       console.error(err)

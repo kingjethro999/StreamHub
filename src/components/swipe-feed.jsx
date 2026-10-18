@@ -1,361 +1,178 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
-import { createClient } from "../lib/supabase/client"
-import { Eye, Heart, Share2, MessageCircle, Repeat2 } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar"
-import { CommentsPanel } from "./comments-panel"
-import { ShareModal } from "./share-modal"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { listStreams } from "../lib/api"
+import { ShortPlayer } from "./short-player"
 
+/**
+ * Full-screen vertical feed of shorts (the Home page). One short is active at
+ * a time based on how much of it is visible; only the active one plays.
+ *
+ * Polished with:
+ *   - Touch/swipe gestures to jump to the next or previous short
+ *   - Preloading of the upcoming short's video for instant playback
+ */
 export function SwipeFeed() {
-    const [streams, setStreams] = useState([])
-    const [loading, setLoading] = useState(true)
+  const [streams, setStreams] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [activeId, setActiveId] = useState(null)
 
-    useEffect(() => {
-        const fetchStreams = async () => {
-            const supabase = createClient()
-            try {
-                const { data, error } = await supabase
-                    .from("streams")
-                    .select(`
-            *,
-            channel:channels(*)
-          `)
-                    .eq("status", "live")
-                    .order("created_at", { ascending: false })
+  const touchStartRef = useRef({ y: 0, x: 0, t: 0 })
 
-                if (error) throw error
-                setStreams(data || [])
-            } catch (error) {
-                console.error("Error fetching streams:", error)
-            } finally {
-                setLoading(false)
-            }
-        }
+  useEffect(() => {
+    let cancelled = false
 
-        fetchStreams()
-    }, [])
-
-    if (loading) {
-        return (
-            <div className="absolute inset-0 flex items-center justify-center bg-background">
-                <div className="animate-pulse flex flex-col items-center gap-4">
-                    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-muted-foreground font-medium">Loading feed...</p>
-                </div>
-            </div>
-        )
+    const load = async () => {
+      try {
+        const data = await listStreams({ order: "created_at", dir: "desc", limit: 100 })
+        if (cancelled) return
+        const list = data || []
+        setStreams(list)
+        setActiveId(list[0]?.id ?? null)
+      } catch (error) {
+        console.error("Error fetching streams:", error)
+        if (!cancelled) setStreams([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
 
-    if (streams.length === 0) {
-        return (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background px-4 text-center">
-                <img
-                    src="/workspace-desk-setup-streaming.jpg"
-                    alt="No streams available"
-                    className="w-64 max-w-full mb-8 rounded-lg opacity-80 mix-blend-luminosity"
-                />
-                <p className="text-muted-foreground">No streams available. Be the first to upload!</p>
-            </div>
-        )
+    load()
+    return () => {
+      cancelled = true
     }
+  }, [])
 
+  const activeIndex = useCallback(
+    (id) => streams.findIndex((s) => s.id === id),
+    [streams],
+  )
+
+  /** Jump to the short at `targetIndex`, clamping to valid range. */
+  const jumpTo = useCallback(
+    (targetIndex) => {
+      if (streams.length === 0) return
+      const next = Math.min(Math.max(targetIndex, 0), streams.length - 1)
+      const el = document.getElementById(`short-${streams[next].id}`)
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" })
+      }
+      setActiveId(streams[next].id)
+    },
+    [streams],
+  )
+
+  /** Handle vertical swipe gestures on the scroll container. */
+  const onTouchStart = useCallback(
+    (e) => {
+      const touch = e.touches?.[0] || e
+      touchStartRef.current = { y: touch.clientY, x: touch.clientX, t: Date.now() }
+    },
+    [],
+  )
+
+  const onTouchEnd = useCallback(
+    (e) => {
+      const touch = e.changedTouches?.[0] || e
+      const dy = touch.clientY - touchStartRef.current.y
+      const dx = Math.abs(touch.clientX - touchStartRef.current.x)
+      const dt = Date.now() - touchStartRef.current.t
+      // Only treat as a swipe if it was quick, mostly vertical, and meaningful.
+      if (dt > 400 || Math.abs(dy) < 60 || dx > Math.abs(dy)) return
+
+      const idx = activeIndex(activeId)
+      if (dy < 0) {
+        // Swiped up → next short
+        jumpTo(idx + 1)
+      } else {
+        // Swiped down → previous short
+        jumpTo(idx - 1)
+      }
+    },
+    [activeId, activeIndex, jumpTo],
+  )
+
+  if (loading) {
     return (
-        <div className="h-full w-full snap-y snap-mandatory overflow-y-scroll overflow-x-hidden relative bg-black">
-            {streams.map((stream) => (
-                <SwipeFeedItem key={stream.id} stream={stream} />
-            ))}
-        </div>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black">
+        <div className="h-9 w-9 animate-spin rounded-full border-4 border-white/20 border-t-white" />
+        <p className="text-sm font-medium text-white/60">Loading shorts...</p>
+      </div>
     )
+  }
+
+  if (streams.length === 0) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black px-6 text-center">
+        <p className="text-lg font-semibold text-white">No shorts yet</p>
+        <p className="max-w-sm text-sm text-white/60">
+          Nothing has been posted here yet. Upload a short to get the feed started.
+        </p>
+      </div>
+    )
+  }
+
+  // Preload the short immediately after the active one so it plays instantly.
+  const activeIdx = activeIndex(activeId)
+  const preloadId = activeIdx >= 0 ? streams[activeIdx + 1]?.id : null
+
+  return (
+    <div className="relative h-full w-full bg-black">
+      {/* Shorts wordmark */}
+      <div className="pointer-events-none absolute left-1/2 top-3 z-30 -translate-x-1/2 select-none">
+        <span className="text-sm font-bold tracking-tight text-white drop-shadow-md">Shorts</span>
+      </div>
+
+      <div
+        className="h-full w-full snap-y snap-mandatory overflow-y-scroll overflow-x-hidden overscroll-y-contain"
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+      >
+        {streams.map((stream) => {
+          const isActive = stream.id === activeId
+          const isPreload = stream.id === preloadId
+          return (
+            <FeedItem
+              key={stream.id}
+              stream={stream}
+              active={isActive}
+              preload={isPreload && !isActive}
+              onActive={setActiveId}
+            />
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
-function SwipeFeedItem({ stream }) {
-    const videoRef = useRef(null)
-    const containerRef = useRef(null)
-    const [isPlaying, setIsPlaying] = useState(false)
-    const [liked, setLiked] = useState(false)
-    const [likeCount, setLikeCount] = useState(stream.likes_count || 0)
-    const [isLiking, setIsLiking] = useState(false)
-    const [showComments, setShowComments] = useState(false)
-    const [showShare, setShowShare] = useState(false)
-    const [isRemixing, setIsRemixing] = useState(false)
+function FeedItem({ stream, active, preload, onActive }) {
+  const ref = useRef(null)
 
-    const channel = stream.channel || {}
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
 
-    // Try to use video_url or assume thumbnail_url might hold video if uploaded wrongly without the column
-    const videoSrc = stream.video_url || stream.thumbnail_url
-
-    useEffect(() => {
-        const checkLikeStatus = async () => {
-            const supabase = createClient()
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return
-
-            const { data, error } = await supabase
-                .from('likes')
-                .select('id')
-                .eq('stream_id', stream.id)
-                .eq('user_id', user.id)
-                .maybeSingle()
-
-            if (data && !error) {
-                setLiked(true)
-            }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+          onActive(stream.id)
         }
-
-        checkLikeStatus()
-    }, [stream.id])
-
-    useEffect(() => {
-        const options = {
-            root: null,
-            rootMargin: "0px",
-            threshold: 0.6, // Play when 60% visible
-        }
-
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                    if (videoRef.current) {
-                        videoRef.current.play().catch(() => {
-                            // Browser may block autoplay without user interaction
-                            setIsPlaying(false)
-                        })
-                        setIsPlaying(true)
-                    }
-                } else {
-                    if (videoRef.current) {
-                        videoRef.current.pause()
-                        setIsPlaying(false)
-                    }
-                }
-            })
-        }, options)
-
-        if (containerRef.current) {
-            observer.observe(containerRef.current)
-        }
-
-        return () => {
-            if (containerRef.current) {
-                observer.unobserve(containerRef.current)
-            }
-        }
-    }, [])
-
-    const togglePlay = () => {
-        if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause()
-                setIsPlaying(false)
-            } else {
-                videoRef.current.play().catch(err => console.error("Play failed:", err))
-                setIsPlaying(true)
-            }
-        }
-    }
-
-    const handleLike = async (e) => {
-        e.stopPropagation()
-        if (isLiking) return
-
-        setIsLiking(true)
-        const supabase = createClient()
-
-        try {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) {
-                alert("Log in to like videos!")
-                setIsLiking(false)
-                return
-            }
-
-            if (liked) {
-                // Unlike
-                const { error } = await supabase
-                    .from('likes')
-                    .delete()
-                    .match({ stream_id: stream.id, user_id: user.id })
-
-                if (!error) {
-                    setLiked(false)
-                    setLikeCount(prev => Math.max(0, prev - 1))
-                }
-            } else {
-                // Like
-                const { error } = await supabase
-                    .from('likes')
-                    .insert({ stream_id: stream.id, user_id: user.id })
-
-                if (!error || error.code === '23505') { // 23505 is unique violation, meaning already liked
-                    setLiked(true)
-                    setLikeCount(prev => prev + 1)
-                } else if (error.code === '42P01') {
-                    alert("Run the likes SQL script to create the table!")
-                }
-            }
-        } catch (err) {
-            console.error("Like failed:", err)
-        } finally {
-            setIsLiking(false)
-        }
-    }
-
-    const handleRemix = async (e) => {
-        e.stopPropagation()
-        if (isRemixing) return
-
-        setIsRemixing(true)
-        const supabase = createClient()
-        try {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) {
-                alert("Log in to remix content!")
-                setIsRemixing(false)
-                return
-            }
-
-            const { error } = await supabase.from("reposts").insert({
-                stream_id: stream.id,
-                user_id: user.id
-            })
-
-            if (error) {
-                if (error.code === '42P01') {
-                    alert("Run db.sql to create reposts table!")
-                } else throw error
-            } else {
-                alert("Successfully remixed and saved to your profile!")
-                // This would ideally open a modal for custom captions, keeping basic for now.
-            }
-        } catch (err) {
-            console.error("Remix failed:", err)
-        } finally {
-            setIsRemixing(false)
-        }
-    }
-
-    const formatViewers = (count = 0) => {
-        if (count >= 1000) return `${(count / 1000).toFixed(1)}K`
-        return count.toString()
-    }
-
-    const isCloudinaryVideo = videoSrc && (videoSrc.includes("cloudinary.com") || videoSrc.match(/\.(mp4|webm|ogg)$/i) !== null)
-
-    return (
-        <div
-            ref={containerRef}
-            className="w-full h-full snap-start snap-always relative bg-black flex items-center justify-center cursor-pointer"
-            onClick={togglePlay}
-        >
-            {/* Video element */}
-            {isCloudinaryVideo ? (
-                <video
-                    ref={videoRef}
-                    src={videoSrc}
-                    className="w-full h-full object-cover md:object-contain bg-black"
-                    loop
-                    playsInline
-                    poster={stream.thumbnail_url}
-                />
-            ) : (
-                <div className="relative w-full h-full bg-black">
-                    <img
-                        src={stream.thumbnail_url || "/placeholder.svg?height=1920&width=1080"}
-                        alt={stream.title}
-                        className="w-full h-full object-cover md:object-contain opacity-90"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="bg-black/50 text-white px-4 py-2 rounded-lg backdrop-blur-sm text-sm font-medium">Image/Thumbnail</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Play/Pause indicator overlay */}
-            {!isPlaying && isCloudinaryVideo && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/10 z-0">
-                    <svg className="w-16 h-16 text-white/70 drop-shadow-lg" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                    </svg>
-                </div>
-            )}
-
-            {/* Overlay - Right Side Actions */}
-            <div className="absolute right-4 bottom-24 flex flex-col items-center gap-6 z-10" onClick={(e) => e.stopPropagation()}>
-                <div className="relative group cursor-pointer hover:scale-105 transition-transform mb-2">
-                    <Avatar className="h-12 w-12 border-2 border-white/80 bg-zinc-900 shadow-lg">
-                        <AvatarImage src={channel.avatar_url || ""} />
-                        <AvatarFallback className="text-white bg-zinc-800">{channel.name ? channel.name.charAt(0) : "U"}</AvatarFallback>
-                    </Avatar>
-                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-red-600 w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold border-2 border-transparent">
-                        +
-                    </div>
-                </div>
-
-                {/* Like Button */}
-                <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={handleLike}>
-                    <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white group-hover:bg-black/60 transition-all">
-                        <Heart size={22} className={liked ? "text-red-500 fill-red-500" : "text-white"} />
-                    </div>
-                    <span className="text-white text-[11px] font-bold drop-shadow-md">
-                        {formatViewers(likeCount)}
-                    </span>
-                </div>
-
-                {/* Comment Button */}
-                <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={(e) => { e.stopPropagation(); setShowComments(true); }}>
-                    <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white group-hover:bg-black/60 transition-all">
-                        <MessageCircle size={22} fill={showComments ? "white" : "none"} className={showComments ? "text-white fill-white" : "text-white"} />
-                    </div>
-                    <span className="text-white text-[11px] font-bold drop-shadow-md">View</span>
-                </div>
-
-                {/* Remix Button */}
-                <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={handleRemix}>
-                    <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white group-hover:bg-black/60 transition-all">
-                        <Repeat2 size={24} className={isRemixing ? "text-primary animate-spin" : "text-white"} />
-                    </div>
-                    <span className="text-white text-[11px] font-bold drop-shadow-md">Remix</span>
-                </div>
-
-                {/* Share Button */}
-                <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={(e) => { e.stopPropagation(); setShowShare(true); }}>
-                    <div className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md flex items-center justify-center text-white group-hover:bg-black/60 transition-all">
-                        <Share2 size={22} fill="white" className="text-white" />
-                    </div>
-                    <span className="text-white text-[11px] font-bold drop-shadow-md">Share</span>
-                </div>
-            </div>
-
-            {/* Overlay - Bottom Gradient & Info */}
-            <div className="absolute bottom-0 left-0 right-0 h-48 bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-0" />
-            <div className="absolute left-4 bottom-4 right-20 z-10 text-white" onClick={(e) => e.stopPropagation()}>
-                <h3 className="font-bold text-base mb-1 drop-shadow-lg flex items-center gap-2 cursor-pointer hover:underline">
-                    @{channel.name || "user"}
-                    {stream.status === "live" && (
-                        <span className="bg-red-600 text-white text-[9px] font-bold px-1.5 py-0.5 rounded animate-pulse uppercase tracking-wider">
-                            Live
-                        </span>
-                    )}
-                </h3>
-                <p className="text-sm drop-shadow-md mb-2">{stream.title}</p>
-                <p className="text-[13px] text-white/80 drop-shadow-md">
-                    {stream.description && <span className="line-clamp-2">{stream.description}</span>}
-                </p>
-            </div>
-
-            {/* Modals & Overlays */}
-            <CommentsPanel
-                streamId={stream.id}
-                isOpen={showComments}
-                onClose={() => setShowComments(false)}
-            />
-
-            <ShareModal
-                streamId={stream.id}
-                isOpen={showShare}
-                onClose={() => setShowShare(false)}
-            />
-        </div>
+      },
+      { threshold: [0.6] },
     )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [onActive, stream.id])
+
+  return (
+    <section
+      ref={ref}
+      id={`short-${stream.id}`}
+      className="h-full w-full snap-start snap-always"
+    >
+      <ShortPlayer stream={stream} active={active} preload={preload} />
+    </section>
+  )
 }

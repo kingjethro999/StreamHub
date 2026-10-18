@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { createClient } from "../lib/supabase/client"
+import { listStreams } from "../lib/api"
 import { StreamCard } from "./stream-card"
 import { CategoryFilter } from "./category-filter"
 
@@ -11,35 +11,30 @@ export function StreamCatalog() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
     const fetchStreams = async () => {
-      const supabase = createClient()
-
+      setLoading(true)
       try {
-        let query = supabase
-          .from("streams")
-          .select(`
-            *,
-            channel:channels(*)
-          `)
-          .eq("status", "live")
-          .order("viewers_count", { ascending: false })
-
-        if (selectedCategory !== "all") {
-          query = query.eq("channel.category", selectedCategory)
-        }
-
-        const { data, error } = await query
-
-        if (error) throw error
-        setStreams(data || [])
+        const data = await listStreams({
+          status: "live",
+          category: selectedCategory,
+          order: "viewers_count",
+          dir: "desc",
+        })
+        if (!cancelled) setStreams(data || [])
       } catch (error) {
         console.error("Error fetching streams:", error)
+        if (!cancelled) setStreams([])
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
 
     fetchStreams()
+    return () => {
+      cancelled = true
+    }
   }, [selectedCategory])
 
   return (

@@ -91,6 +91,11 @@ export function recordStreamView(id) {
   return api.post(`/streams/${encodeURIComponent(id)}/view`, {})
 }
 
+/** AI video summary — server-side NVIDIA call, key never in browser. */
+export function getVideoSummary(streamId) {
+  return api.post("/ai/video-summary", { stream_id: streamId })
+}
+
 // ---------------------------------------------------------------------------
 // Channels
 // ---------------------------------------------------------------------------

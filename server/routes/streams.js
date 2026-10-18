@@ -84,6 +84,37 @@ export default async function streamRoutes(fastify) {
     return reply.code(201).send(stream)
   }))
 
+  // Edit stream metadata (title / description). Owner-only.
+  fastify.patch("/streams/:id", { preHandler: fastify.authenticate }, route(async (request, reply) => {
+    const body = request.body ?? {}
+    const updates = []
+    const params = [request.params.id, request.user.id]
+
+    if (typeof body.title === "string" && body.title.trim()) {
+      updates.push(`title = $${params.push(body.title.trim())}`)
+    }
+    if (typeof body.description === "string") {
+      updates.push(`description = $${params.push(body.description)}`)
+    }
+
+    if (updates.length === 0) {
+      throw badRequest("Nothing to update")
+    }
+
+    const stream = await queryOne(
+      `update streams s
+         set ${updates.join(", ")}
+       from channels c
+       where s.channel_id = c.id
+         and s.id = $1
+         and c.creator_id = $2
+       returning s.*`,
+      params,
+    )
+    if (!stream) throw unauthorized("You can only edit your own streams", "NOT_OWNER")
+    return reply.send(stream)
+  }))
+
   // Best-effort view counter used by the stream player.
   fastify.post("/streams/:id/view", route(async (request, reply) => {
     const updated = await queryOne(

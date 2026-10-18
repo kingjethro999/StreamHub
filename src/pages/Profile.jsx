@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef } from "react"
 import { useNavigate } from "react-router-dom"
-import { getCurrentUser, logout, getMyChannel, saveMyChannel, getChannelStreams } from "../lib/api"
-import { LogOut, UploadCloud, Copy, Plus, Trash2, Play, BarChart3, Users, Video, Eye } from "lucide-react"
+import { getCurrentUser, logout, getMyChannel, saveMyChannel, getChannelStreams, updateStream, deleteStream } from "../lib/api"
+import { LogOut, UploadCloud, Copy, Plus, Trash2, Play, Users, Video, Eye, Edit2 } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { Card } from "../components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar"
@@ -16,6 +16,13 @@ export default function Profile() {
 
   const [activeTab, setActiveTab] = useState("customization")
   const [streams, setStreams] = useState([])
+
+  // Stream edit / delete state (upload management)
+  const [editingStreamId, setEditingStreamId] = useState(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editDescription, setEditDescription] = useState("")
+  const [deletingStreamId, setDeletingStreamId] = useState(null)
+  const [savingEdit, setSavingEdit] = useState(false)
 
   // Form State
   const [name, setName] = useState("")
@@ -156,6 +163,55 @@ export default function Profile() {
       alert("Failed to publish profile updates: " + (err.message || "Unknown error"))
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openEdit = (stream) => {
+    setEditingStreamId(stream.id)
+    setEditTitle(stream.title || "")
+    setEditDescription(stream.description ?? "")
+  }
+
+  const closeEdit = () => {
+    setEditingStreamId(null)
+    setEditTitle("")
+    setEditDescription("")
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingStreamId) return
+    setSavingEdit(true)
+    try {
+      await updateStream(editingStreamId, {
+        title: editTitle.trim() || "Untitled",
+        description: editDescription || null,
+      })
+      const channelData = await getMyChannel()
+      if (channelData) {
+        const streamsData = await getChannelStreams(channelData.id)
+        setStreams(streamsData || [])
+      }
+      closeEdit()
+    } catch (err) {
+      console.error("Failed to update stream:", err)
+      alert("Failed to update stream: " + (err.message || "Unknown error"))
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const handleDelete = async (streamId) => {
+    if (!window.confirm("Delete this video? This cannot be undone.")) return
+    setDeletingStreamId(streamId)
+    try {
+      await deleteStream(streamId)
+      setStreams((prev) => prev.filter((s) => s.id !== streamId))
+      if (editingStreamId === streamId) closeEdit()
+    } catch (err) {
+      console.error("Failed to delete stream:", err)
+      alert("Failed to delete stream: " + (err.message || "Unknown error"))
+    } finally {
+      setDeletingStreamId(null)
     }
   }
 
@@ -426,9 +482,46 @@ export default function Profile() {
                 </div>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {streams.map(stream => (
-                    <div key={stream.id} className="group relative aspect-[9/16] bg-black rounded-xl overflow-hidden cursor-pointer border border-border shadow-sm hover:ring-2 ring-primary transition-all" onClick={() => navigate(`/stream/${stream.id}`)}>
-                      <img src={stream.thumbnail_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&h=888&fit=crop"} alt={stream.title} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                  {streams.map((stream) => (
+                    <div
+                      key={stream.id}
+                      className="group relative aspect-[9/16] bg-black rounded-xl overflow-hidden cursor-pointer border border-border shadow-sm hover:ring-2 ring-primary transition-all"
+                      onClick={() => {
+                        if (editingStreamId === stream.id) return
+                        navigate(`/stream/${stream.id}`)
+                      }}
+                    >
+                      <img
+                        src={stream.thumbnail_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=500&h=888&fit=crop"}
+                        alt={stream.title}
+                        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                      />
+                      {/* Card actions overlay */}
+                      <div className="absolute top-2 right-2 flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openEdit(stream)
+                          }}
+                          aria-label="Edit video"
+                          className="p-2 rounded-full bg-black/60 text-white hover:bg-white text-black transition"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDelete(stream.id)
+                          }}
+                          aria-label="Delete video"
+                          disabled={deletingStreamId === stream.id}
+                          className="p-2 rounded-full bg-red-500/90 text-white hover:bg-red-600 transition disabled:opacity-50"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent flex flex-col justify-end p-4">
                         <p className="text-white font-medium text-sm line-clamp-2 mb-2 leading-tight">{stream.title}</p>
                         <div className="flex items-center text-white/90 text-xs font-semibold">
@@ -446,16 +539,71 @@ export default function Profile() {
           {activeTab === 'analytics' && (
             <div className="space-y-6">
               <h2 className="text-xl font-bold mb-6">Channel Analytics</h2>
-              <Card className="p-8 text-center py-24 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center">
-                <div className="p-6 bg-muted/50 rounded-full mb-6">
-                  <BarChart3 size={48} className="text-muted-foreground opacity-70" />
-                </div>
-                <h3 className="text-xl font-bold mb-3">Detailed Analytics Coming Soon</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">We are building out advanced charts to help you track your channel's exact performance over time.</p>
-              </Card>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="p-6 flex flex-col items-center justify-center text-center space-y-2 border-border shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full text-primary"><Eye size={24} /></div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Total Views</h3>
+                  <p className="text-3xl font-bold">
+                    {streams.reduce((acc, curr) => acc + (curr.views_count || 0), 0)}
+                  </p>
+                </Card>
+                <Card className="p-6 flex flex-col items-center justify-center text-center space-y-2 border-border shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full text-primary"><Play size={24} /></div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Total Videos</h3>
+                  <p className="text-3xl font-bold">{streams.length}</p>
+                </Card>
+                <Card className="p-6 flex flex-col items-center justify-center text-center space-y-2 border-border shadow-sm">
+                  <div className="p-3 bg-primary/10 rounded-full text-primary"><Users size={24} /></div>
+                  <h3 className="text-sm font-medium text-muted-foreground">Subscribers</h3>
+                  <p className="text-3xl font-bold">
+                    {channelId ? (streams[0]?.channel?.followers_count ?? 0) : 0}
+                  </p>
+                </Card>
+              </div>
             </div>
           )}
 
+          {/* Edit stream dialog */}
+          {editingStreamId && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) closeEdit()
+              }}
+            >
+              <div className="w-full max-w-sm bg-card border border-border rounded-xl p-6 shadow-2xl animate-in scale-in duration-200 m-4">
+                <h3 className="text-lg font-bold mb-4">Edit video</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-semibold block mb-1">Title</label>
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      placeholder="Video title"
+                      className="w-full bg-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-semibold block mb-1">Description</label>
+                    <textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      placeholder="Description..."
+                      className="w-full min-h-[100px] rounded-md border border-input bg-input px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-y"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4">
+                    <Button variant="outline" onClick={closeEdit} disabled={savingEdit}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveEdit} disabled={savingEdit}>
+                      {savingEdit ? "Saving…" : "Save changes"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

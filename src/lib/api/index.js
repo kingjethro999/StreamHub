@@ -87,6 +87,11 @@ export function deleteStream(id) {
   return api.del(`/streams/${encodeURIComponent(id)}`)
 }
 
+/** Update stream metadata (title / description). Owner-only. */
+export function updateStream(id, body) {
+  return api.patch(`/streams/${encodeURIComponent(id)}`, body)
+}
+
 export function recordStreamView(id) {
   return api.post(`/streams/${encodeURIComponent(id)}/view`, {})
 }

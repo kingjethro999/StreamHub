@@ -205,3 +205,19 @@ export function markNotificationRead(id) {
 export function markAllNotificationsRead() {
   return api.post("/notifications/read-all")
 }
+
+// ---------------------------------------------------------------------------
+// Discovery
+// ---------------------------------------------------------------------------
+
+export function getRecommendations(options = {}) {
+  return api.get(`/discovery/recommendations${toQuery(options)}`)
+}
+
+export function getTrending(options = {}) {
+  return api.get(`/discovery/trending${toQuery(options)}`)
+}
+
+export function semanticSearch(q) {
+  return api.get(`/discovery/semantic-search${toQuery({ q })}`)
+}

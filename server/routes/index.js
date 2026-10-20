@@ -8,6 +8,7 @@ import followRoutes from "./follows.js"
 import notifyRoutes from "./notify.js"
 import notificationRoutes from "./notifications.js"
 import aiRoutes from "./ai.js"
+import discoveryRoutes from "./discovery.js"
 
 export default async function registerRoutes(fastify) {
   fastify.get("/health", async () => ({ ok: true, uptime: process.uptime() }))
@@ -21,5 +22,6 @@ export default async function registerRoutes(fastify) {
   await fastify.register(followRoutes)
   await fastify.register(notifyRoutes)
   await fastify.register(notificationRoutes)
+  await fastify.register(discoveryRoutes)
   await fastify.register(aiRoutes)
 }

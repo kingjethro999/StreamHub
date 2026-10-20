@@ -153,12 +153,13 @@ export function getMyReposts() {
 // Comments
 // ---------------------------------------------------------------------------
 
-export function getComments(streamId) {
-  return api.get(`/comments${toQuery({ stream_id: streamId })}`)
+export function getComments(streamId, options = {}) {
+  const params = { stream_id: streamId, ...options }
+  return api.get(`/comments${toQuery(params)}`)
 }
 
-export function postComment(streamId, content) {
-  return api.post("/comments", { stream_id: streamId, content })
+export function postComment(streamId, content, parentId) {
+  return api.post("/comments", { stream_id: streamId, content, parent_id: parentId ?? null })
 }
 
 // ---------------------------------------------------------------------------

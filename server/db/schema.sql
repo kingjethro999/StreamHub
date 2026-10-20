@@ -74,9 +74,14 @@ create table if not exists comments (
   id         uuid primary key default gen_random_uuid(),
   stream_id  uuid not null references streams(id) on delete cascade,
   user_id    uuid not null references users(id) on delete cascade,
+  parent_id  uuid references comments(id) on delete cascade,
   content    text not null,
   created_at timestamptz default now()
 );
+
+-- Backfill parent_id column on existing databases
+alter table if exists comments
+  add column if not exists parent_id uuid references comments(id) on delete cascade;
 
 -- 7. Reposts ---------------------------------------------------------------
 create table if not exists reposts (
@@ -127,4 +132,5 @@ create index if not exists idx_streams_title        on public.streams (title);
 create index if not exists idx_follows_channel_id   on public.follows (channel_id);
 create index if not exists idx_follows_follower     on public.follows (follower_id);
 create index if not exists idx_comments_stream_id   on public.comments (stream_id);
+create index if not exists idx_comments_parent_id   on public.comments (parent_id);
 create index if not exists idx_likes_stream_user    on public.likes (stream_id, user_id);

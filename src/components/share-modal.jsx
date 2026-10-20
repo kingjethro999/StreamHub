@@ -1,7 +1,7 @@
 "use client"
 
-import { X, Copy, Check, MessageCircle } from "lucide-react"
-import { useState } from "react"
+import { X, Copy, Check, MessageCircle, Share2 } from "lucide-react"
+import { useState, useEffect } from "react"
 
 // lucide-react v1 dropped brand icons, so X/Twitter and Facebook keep
 // their own inline glyphs.
@@ -23,8 +23,11 @@ function FacebookIcon({ size = 24 }) {
 
 export function ShareModal({ streamId, isOpen, onClose }) {
     const [copied, setCopied] = useState(false)
+    const [nativeShareAvailable, setNativeShareAvailable] = useState(false)
 
-    if (!isOpen) return null
+    useEffect(() => {
+        setNativeShareAvailable(typeof navigator.share === "function")
+    }, [])
 
     const shareUrl = `${window.location.origin}/stream/${streamId}`
 
@@ -35,6 +38,20 @@ export function ShareModal({ streamId, isOpen, onClose }) {
             setTimeout(() => setCopied(false), 2000)
         } catch (err) {
             console.error("Failed to copy:", err)
+        }
+    }
+
+    if (!isOpen) return null
+
+    const handleNativeShare = async () => {
+        try {
+            await navigator.share({
+                title: "Watch this on StreamHub",
+                text: "Check out this short on StreamHub",
+                url: shareUrl,
+            })
+        } catch (err) {
+            if (err.name !== "AbortError") console.error("Native share failed:", err)
         }
     }
 
@@ -82,6 +99,18 @@ export function ShareModal({ streamId, isOpen, onClose }) {
                 </div>
 
                 <div className="grid grid-cols-3 gap-4 mb-8">
+                    {nativeShareAvailable && (
+                        <button
+                            type="button"
+                            onClick={handleNativeShare}
+                            className="flex flex-col items-center gap-2 group"
+                        >
+                            <div className="w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center transition-colors group-hover:bg-primary/90">
+                                <Share2 size={20} />
+                            </div>
+                            <span className="text-xs font-medium">Device</span>
+                        </button>
+                    )}
                     {shareTargets.map(({ label, icon, className, onClick }) => (
                         <button
                             key={label}

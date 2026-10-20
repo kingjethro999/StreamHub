@@ -1,6 +1,7 @@
 import { query, queryOne } from "../db.js"
 import { notFound, badRequest, unauthorized, route } from "../errors.js"
 import { streamWithChannelSql } from "./channels.js"
+import { createNotification } from "./notifications.js"
 
 const ORDERABLE = {
   created_at: "s.created_at",
@@ -80,6 +81,30 @@ export default async function streamRoutes(fastify) {
         body.status === "offline" ? "offline" : "live",
       ],
     )
+
+    // Notify followers when a stream goes live (fire-and-forget, non-blocking)
+    if (stream.status === "live") {
+      ;(async () => {
+        try {
+          const followers = await query(
+            `select follower_id from follows where channel_id = $1`,
+            [channel.id],
+          )
+          await Promise.all(followers.map((f) =>
+            createNotification({
+              userId: f.follower_id,
+              actorId: request.user.id,
+              type: "live",
+              stream_id: stream.id,
+            }).catch((_) => {
+              /* individual notification failures are non-fatal */
+            }),
+          ))
+        } catch (_) {
+          request.log.warn({ err: _ }, "Failed to create live notifications")
+        }
+      })()
+    }
 
     return reply.code(201).send(stream)
   }))

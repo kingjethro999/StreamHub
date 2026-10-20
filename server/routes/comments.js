@@ -1,5 +1,6 @@
 import { query, queryOne } from "../db.js"
 import { badRequest, route } from "../errors.js"
+import { createNotification } from "./notifications.js"
 
 // Comments are returned with a `profiles` object so the existing UI keeps working:
 //   comment.profiles.username / comment.profiles.avatar_url
@@ -41,6 +42,30 @@ export default async function commentRoutes(fastify) {
        returning id`,
       [streamId, request.user.id, parentId ?? null, content.trim()],
     )
+
+    // Notify stream owner (top-level comment) or parent comment author (reply)
+    const target = await queryOne(
+      `select c.user_id as comment_owner, s.channel_id, ch.creator_id as stream_owner
+       from comments c
+       join streams s on s.id = c.stream_id
+       left join channels ch on ch.id = s.channel_id
+       where c.id = $1`,
+      [created.id],
+    )
+    if (target) {
+      const notifyUserId = parentId ? target.comment_owner : target.stream_owner
+      if (notifyUserId && notifyUserId !== request.user.id) {
+        await createNotification({
+          userId: notifyUserId,
+          actorId: request.user.id,
+          type: parentId ? "comment" : "comment",
+          stream_id: streamId,
+          comment_id: created.id,
+        }).catch((err) => {
+          request.log.warn({ err }, "Failed to create comment notification")
+        })
+      }
+    }
 
     const comment = await queryOne(`${COMMENT_SELECT} where c.id = $1`, [created.id])
     return reply.code(201).send(comment)

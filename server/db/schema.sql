@@ -83,6 +83,21 @@ create table if not exists comments (
 alter table if exists comments
   add column if not exists parent_id uuid references comments(id) on delete cascade;
 
+-- 6b. Notifications ----------------------------------------------------------
+create table if not exists notifications (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references users(id) on delete cascade,
+  actor_id   uuid references users(id) on delete set null,
+  type       text not null,              -- 'follow', 'like', 'comment', 'live', 'mention'
+  stream_id  uuid references streams(id) on delete cascade,
+  comment_id uuid references comments(id) on delete cascade,
+  read       boolean not null default false,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_notifications_user_read on public.notifications (user_id, read, created_at desc);
+create index if not exists idx_notifications_actor on public.notifications (actor_id);
+
 -- 7. Reposts ---------------------------------------------------------------
 create table if not exists reposts (
   id         uuid primary key default gen_random_uuid(),

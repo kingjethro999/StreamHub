@@ -1,5 +1,6 @@
 import { query, queryOne } from "../db.js"
 import { badRequest, route } from "../errors.js"
+import { createNotification } from "./notifications.js"
 
 export default async function followRoutes(fastify) {
   // Used by the Activity feed: every channel the signed-in user follows.
@@ -38,6 +39,24 @@ export default async function followRoutes(fastify) {
        returning id`,
       [request.user.id, channelId],
     )
+
+    // Notify the channel owner of the new follower (only on actual insert)
+    if (inserted) {
+      const owner = await queryOne(
+        `select creator_id from channels where id = $1`,
+        [channelId],
+      )
+      if (owner && owner.creator_id !== request.user.id) {
+        await createNotification({
+          userId: owner.creator_id,
+          actorId: request.user.id,
+          type: "follow",
+          stream_id: null,
+        }).catch((err) => {
+          request.log.warn({ err }, "Failed to create follow notification")
+        })
+      }
+    }
 
     return reply.code(inserted ? 201 : 200).send({ following: true })
   }))

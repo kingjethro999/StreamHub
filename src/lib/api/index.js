@@ -189,3 +189,19 @@ export function isFollowing(channelId) {
 export function notifyFollowers(payload) {
   return api.post("/notify-followers", payload)
 }
+
+export function getNotifications(options = {}) {
+  return api.get(`/notifications${toQuery(options)}`)
+}
+
+export function getUnreadCount() {
+  return api.get("/notifications/unread-count")
+}
+
+export function markNotificationRead(id) {
+  return api.post(`/notifications/${encodeURIComponent(id)}/read`)
+}
+
+export function markAllNotificationsRead() {
+  return api.post("/notifications/read-all")
+}

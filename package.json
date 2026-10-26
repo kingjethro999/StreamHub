@@ -18,6 +18,8 @@
     "db:setup": "node server/db/migrate.js && node server/db/seed.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1156.0",
+    "@aws-sdk/s3-request-presigner": "^3.1156.0",
     "@fastify/cors": "^11.3.1",
     "@fastify/jwt": "^10.2.4",
     "@fastify/static": "^10.1.6",
@@ -28,6 +30,7 @@
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^18.0.9",
     "fastify": "^5.12.7",
     "lucide-react": "^1.58.0",
     "nodemailer": "^10.1.2",

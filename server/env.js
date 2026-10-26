@@ -34,6 +34,14 @@ export const config = {
     apiKey: process.env.NVIDIA_API_KEY,
     apiBase: process.env.NVIDIA_API_BASE || "https://integrate.api.nvidia.com/v1",
   },
+  // S3-compatible storage (Neon) for operator-side video seeding.
+  s3: {
+    endpoint: process.env.S3_ENDPOINT,
+    region: process.env.S3_REGION || "us-east-2",
+    accessKeyId: process.env.S3_ACCESS_KEY_ID,
+    secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+    bucket: process.env.S3_BUCKET || "assets",
+  },
 }
 
 export function assertRuntimeEnv() {

@@ -2,6 +2,8 @@ import { query, queryOne } from "../db.js"
 import { notFound, badRequest, unauthorized, route } from "../errors.js"
 import { streamWithChannelSql } from "./channels.js"
 import { createNotification } from "./notifications.js"
+import { uploadVideo, S3_BUCKET } from "../lib/s3.js"
+import { config } from "../env.js"
 
 const ORDERABLE = {
   created_at: "s.created_at",
@@ -165,5 +167,48 @@ export default async function streamRoutes(fastify) {
     )
     if (!stream) throw unauthorized("You can only delete your own streams", "NOT_OWNER")
     return reply.send({ deleted: true, id: stream.id })
+  }))
+
+  // Operator-only: upload a video file to S3 and create a stream record.
+  // Body: multipart/form-data with `file`, `title`, `description`, `category`
+  fastify.post("/streams/upload-s3", { preHandler: fastify.authenticate }, route(async (request, reply) => {
+    const body = request.body ?? {}
+    const file = body.file
+    if (!file) throw badRequest("No file uploaded")
+    if (!body.title || !body.title.trim()) throw badRequest("A title is required")
+
+    const channel = await queryOne(
+      `select id from channels where creator_id = $1`,
+      [request.user.id],
+    )
+    if (!channel) {
+      throw badRequest("You must create a channel before uploading. Go to Settings to set up your profile.", "NO_CHANNEL")
+    }
+
+    const key = `streams/${request.user.id}/${Date.now()}-${file.filename.replace(/\s+/g, "_")}`
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+
+    await uploadVideo(key, buffer, file.mimetype || "video/mp4")
+
+    // Generate an S3 URL for the video. For Neon S3-compatible storage,
+    // the public URL is {endpoint}/{bucket}/{key}.
+    const videoUrl = `${config.s3Endpoint}/${S3_BUCKET}/${key}`
+
+    const stream = await queryOne(
+      `insert into streams (channel_id, title, description, thumbnail_url, video_url, status, viewers_count, views_count)
+       values ($1, $2, $3, $4, $5, $6, 0, 0)
+       returning *`,
+      [
+        channel.id,
+        body.title.trim(),
+        body.description ?? null,
+        body.thumbnail_url ?? null,
+        videoUrl,
+        body.status === "offline" ? "offline" : "live",
+      ],
+    )
+
+    return reply.code(201).send(stream)
   }))
 }

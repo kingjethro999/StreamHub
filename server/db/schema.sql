@@ -55,10 +55,15 @@ create table if not exists streams (
   viewers_count  integer default 0,
   views_count    integer default 0,
   likes_count    integer default 0,
+  hashtags       text[] default '{}',
   created_at     timestamptz default now(),
   started_at     timestamptz,
   ended_at       timestamptz
 );
+
+-- Backfill hashtags column on existing databases
+alter table if exists streams
+  add column if not exists hashtags text[] default '{}';
 
 -- 5. Follows ---------------------------------------------------------------
 create table if not exists follows (

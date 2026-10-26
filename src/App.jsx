@@ -10,6 +10,7 @@ import Login from "./pages/auth/Login"
 import SignUp from "./pages/auth/SignUp"
 import StreamDetails from "./pages/StreamDetails"
 import ChannelDetails from "./pages/ChannelDetails"
+import Metrics from "./pages/Metrics"
 import { Layout } from "./components/layout"
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
         <Route path="/upload" element={<Upload />} />
         <Route path="/stream/:id" element={<StreamDetails />} />
         <Route path="/channel/:id" element={<ChannelDetails />} />
+        <Route path="/metrics" element={<Metrics />} />
       </Route>
 
       <Route path="/auth/login" element={<Login />} />

@@ -221,3 +221,11 @@ export function getTrending(options = {}) {
 export function semanticSearch(q) {
   return api.get(`/discovery/semantic-search${toQuery({ q })}`)
 }
+
+// ---------------------------------------------------------------------------
+// Metrics
+// ---------------------------------------------------------------------------
+
+export function metricsApi() {
+  return api.get("/metrics")
+}
